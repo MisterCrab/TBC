@@ -127,16 +127,34 @@ end
 -------------------------------------------------------------------------------
 local BigWigs_GetTimeRemaining
 if BigWigsLoader then 	
-	_G.SlashCmdList.BigWigs()
-	if _G.BigWigsOptions then
-		_G.BigWigsOptions:Close()
-	else 
-		-- For old versions
-		_G.SlashCmdList.BigWigs()
-	end
+	A.BossMods.HasBigWigs = true 	
 	
-	A.BossMods.HasBigWigs 	= true 	
-	BIGWIGS_TIMER_PULL		= strlowerCache[_G.BigWigsAPI:GetLocale("BigWigs: Plugins").pull]
+	local BigWigsPluginsName = "BigWigs_Plugins"
+	if  _G.IsAddOnLoaded(BigWigsPluginsName) then 
+		BIGWIGS_TIMER_PULL = strlowerCache[_G.BigWigsAPI:GetLocale("BigWigs: Plugins").pull]
+	else 
+		local L = setmetatable({
+			enUS = "Pull",
+			deDE = "Pull",
+			esES = "Pull",
+			itIT = "Ingaggio",
+			frFR = "Pull",
+			esMS = "Llamado de jefe",
+			koKR = "전투 예정",
+			ptBR = "Pull",
+			zhCN = "拉怪",
+			ruRU = "Атака",
+			zhTW = "開怪倒數",
+		}, { __index = function(self) return self.enUS end })
+		BIGWIGS_TIMER_PULL = L[GetLocale()] 	
+					
+		A.Listener:Add("ACTION_BIGWIGS_PLUGINS", "ADDON_LOADED", function(addonName)
+			if addonName == BigWigsPluginsName then 
+				BIGWIGS_TIMER_PULL = strlowerCache[_G.BigWigsAPI:GetLocale("BigWigs: Plugins").pull]
+				A.Listener:Remove("ACTION_BIGWIGS_PLUGINS", "ADDON_LOADED")
+			end 		
+		end); _G.LoadAddOn(BigWigsPluginsName)	
+	end 
 	
 	local Timers, owner = {}, {}
 	local function stop(module, text)
