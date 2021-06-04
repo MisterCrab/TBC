@@ -1,0 +1,72 @@
+## Interface: 20501
+## Title: TellMeWhen |cff00ccff The Action|r
+## Notes: (\/)O_O(\/)
+## RequiredDeps: TellMeWhen
+## DefaultState: enabled
+## LoadWith: TellMeWhen
+## SavedVariables: TheActionClassicSettings
+
+# Toaster
+Lib\Toaster\embeds.xml
+Lib\Toaster\Localization\enUS.lua
+Lib\Toaster\Localization\deDE.lua
+Lib\Toaster\Localization\esES.lua
+Lib\Toaster\Localization\esMX.lua
+Lib\Toaster\Localization\frFR.lua
+Lib\Toaster\Localization\koKR.lua
+Lib\Toaster\Localization\ptBR.lua
+Lib\Toaster\Localization\ruRU.lua
+Lib\Toaster\Localization\zhCN.lua
+Lib\Toaster\Localization\zhTW.lua
+Lib\Toaster\Core.lua
+Lib\Toaster\Config.lua
+
+Lib\LibSharedMedia-3.0\lib.xml
+Lib\ForAllIndentsAndPurposes.lua
+Lib\LibBossIDs-1.0.lua
+Lib\LibDBIcon-1.0.lua
+Lib\StdUI\StdUi.xml
+
+# Classic Libs 
+Lib\DRList-1.0\DRList-1.0.xml
+Lib\LibHealComm-4.0\LibHealComm-4.0.xml
+Lib\LibSpellLock.lua
+Lib\LibAuraTypes.lua
+Lib\GetTotemInfo.lua
+
+# First constans!
+Modules\Components\Const\Constans.lua
+
+Action.lua
+
+Modules\Components\Enum\TriggerGCD.lua
+Modules\Components\Tools.lua
+Modules\Components\Utils.lua
+
+Modules\Dependences\MacroLibrary.lua
+Modules\Dependences\PetLibrary.lua
+
+Modules\Engines\Base.lua
+Modules\Engines\Combat.lua
+Modules\Engines\HealingEngine.lua
+Modules\Engines\MultiUnits.lua
+Modules\Engines\Player.lua
+Modules\Engines\Unit.lua
+Modules\Engines\UnitInspect.lua
+
+Modules\Misc\BossMods.lua
+Modules\Misc\ElvUI.lua
+Modules\Misc\HeroLib.lua
+Modules\Misc\PrevSpell.lua 
+Modules\Misc\DRList.lua
+Modules\Misc\LibHealComm.lua
+Modules\Misc\StdUi.lua
+Modules\Misc\Toaster.lua
+
+Modules\Actions.lua
+Modules\Core.lua
+
+# Test
+# Modules\TestDev\FindG.lua
+# Modules\TestDev\StressTests.lua
+# Modules\TestDev\UpdateTriggerGCD.lua
