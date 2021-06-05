@@ -15,8 +15,8 @@ _G.ACTION_CONST_CACHE_MEM_DRIVE										= false			-- On own risk, it will unloc
 _G.ACTION_CONST_CACHE_DEFAULT_TIMER 								= 0.01			-- "Tools.lua" offset on cache control 
 _G.ACTION_CONST_CACHE_DEFAULT_TIMER_UNIT							= 0.005			-- "Unit.lua" offset on cache control 
 _G.ACTION_CONST_CACHE_DEFAULT_TIMER_MULTIUNIT_CLEU					= 0.004
-_G.ACTION_CONST_CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE				= 20			-- Live: 60, Classic: 20
-_G.ACTION_CONST_CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE_VALIDANCE		= 20 			-- "4e1"
+_G.ACTION_CONST_CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE				= 41			-- Live: 60, Classic: 20б TBC: 41
+_G.ACTION_CONST_CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE_VALIDANCE		= 41 			-- "4e1"
 _G.ACTION_CONST_CACHE_DEFAULT_OFFSET_DUEL							= 2.9			-- Delay until duel starts after event trigger
 
 -- Textures
