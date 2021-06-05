@@ -6948,8 +6948,8 @@ local LineOfSight = {
 			end 
 		else 
 			local GUID = unitGUID or UnitGUID(unitID)
-			-- If not exists (GUID check) or not in GetLOS cache or less than expiration time means in the loss of sight
-			return not GUID or not self.Cache[GUID] or TMW.time < self.Cache[GUID]
+			-- If not exists (GUID check) or in GetLOS cache and less than expiration time means in the loss of sight 
+			return not GUID or (self.Cache[GUID] and TMW.time < self.Cache[GUID])
 		end 
 	end,
 	Wipe 			= function(self)
