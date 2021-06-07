@@ -858,7 +858,7 @@ local function SetColorTarget()
 	end  
 	
 	-- [6] sync-up "Rotation doesn't work if"
-	if SelectStopOptions[6] and PauseChecks() then 
+	if SelectStopOptions[6] and A_PauseChecks() then 
 		return frame:SetColor(none)
 	end 
 	
