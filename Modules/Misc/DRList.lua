@@ -46,7 +46,7 @@ Lib.NextDR = Lib.GetNextDR
 -------------------------------------------------------------------------------
 -- List extend  
 -------------------------------------------------------------------------------	  
-if Lib.gameExpansion == "classic" then 
+if Lib.gameExpansion == "classic" or Lib.gameExpansion == "tbc" then 
 	categoryNames.disarm 				= L.DISARMS
 	
 	-- Disarms
