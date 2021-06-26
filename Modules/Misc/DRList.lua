@@ -9,7 +9,7 @@ local diminishedDurations								= Lib.diminishedDurations[Lib.gameExpansion]
 local categoryNames										= Lib.categoryNames[Lib.gameExpansion]
 local spellList											= Lib.spellList
 
-local _G, error											= _G, error
+local _G, error, type, tostring							= _G, error, type, tostring
 local GetSpellInfo										= _G.GetSpellInfo
 
 -------------------------------------------------------------------------------
@@ -28,7 +28,11 @@ function Lib:GetNextDR(diminished, category)
     end
 	
 	if not durations then 
-		error("Wrong '" .. (category or "") .. "' category for function GetNextDR in the DRList library")
+		local err_level = 1
+		if type(category) == "table" then 
+			err_level = 2
+		end 
+		error("Wrong '" .. (tostring(category) or "") .. "' category for function GetNextDR in the DRList library", err_level)
 	end 
 	
 	return durations and durations[diminished] or 0
