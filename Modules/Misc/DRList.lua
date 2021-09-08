@@ -9,7 +9,7 @@ local diminishedDurations								= Lib.diminishedDurations[Lib.gameExpansion]
 local categoryNames										= Lib.categoryNames[Lib.gameExpansion]
 local spellList											= Lib.spellList
 
-local _G, error, type, tostring							= _G, error, type, tostring
+local _G, pairs											= _G, pairs
 local GetSpellInfo										= _G.GetSpellInfo
 
 -------------------------------------------------------------------------------
@@ -27,14 +27,6 @@ function Lib:GetNextDR(diminished, category)
         durations = diminishedDurations["default"]		
     end
 	
-	if not durations then 
-		local err_level = 1
-		if type(category) == "table" then 
-			err_level = 2
-		end 
-		error("Wrong '" .. (tostring(category) or "") .. "' category for function GetNextDR in the DRList library", err_level)
-	end 
-	
 	return durations and durations[diminished] or 0
 end
 
@@ -44,13 +36,14 @@ function Lib:GetApplicationMax(category)
 	return durations and #durations + 1 or 0
 end 
 
--- keep same API as DRData-1.0 for easier transitions
+-- Keep same API as DRData-1.0 for easier transitions
 Lib.NextDR = Lib.GetNextDR
 
 -------------------------------------------------------------------------------
 -- List extend  
 -------------------------------------------------------------------------------	  
-if Lib.gameExpansion == "classic" or Lib.gameExpansion == "tbc" then 
+
+if Lib.gameExpansion == "classic" then 
 	categoryNames.disarm 				= L.DISARMS
 	
 	-- Disarms
@@ -68,4 +61,30 @@ if Lib.gameExpansion == "classic" or Lib.gameExpansion == "tbc" then
 
 	-- Stuns 
 	spellList[GetSpellInfo(19482)]  	= { category = "stun", spellID = 19482 }   			-- War Stomp (Doomguard pet)
+elseif Lib.gameExpansion == "tbc" then 
+	categoryNames.disarm 				= L.DISARMS
+	
+	-- Disarms
+	spellList[676]     	= "disarm"													  		-- Disarm
+	spellList[14251]   	= "disarm"													   		-- Riposte
+	spellList[23365]   	= "disarm"													   		-- Dropped Weapon
+
+	-- Incapacitates
+	spellList[2094]		= "incapacitate"												 	-- Blind 
+	spellList[9484]		= "incapacitate"												 	-- Shackle Undead 
+	spellList[710]		= "incapacitate"													-- Banish
+
+	-- Turn Undead 
+	spellList[2878]    	= "fear"												        	-- Turn Undead
+																			
+	-- Stuns              													
+	spellList[19482]  	= "stun"												  			-- War Stomp (Doomguard pet)
+end 
+
+-- Merge spellID to spellName otherwise library will not work correctly in many places where used name instead of id, affected non classic versions only
+-- Non classic library has format key = "string", classic library has key = { category = "string", spellID = "number" }
+if Lib.gameExpansion ~= "classic" then 
+	for k, v in pairs(spellList) do 
+		spellList[GetSpellInfo(k)] = v 
+	end 
 end 
