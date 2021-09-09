@@ -84,7 +84,11 @@ end
 -- Merge spellID to spellName otherwise library will not work correctly in many places where used name instead of id, affected non classic versions only
 -- Non classic library has format key = "string", classic library has key = { category = "string", spellID = "number" }
 if Lib.gameExpansion ~= "classic" then 
+	local spellName 
 	for k, v in pairs(spellList) do 
-		spellList[GetSpellInfo(k)] = v 
+		spellName = GetSpellInfo(k)
+		if spellName then 
+			spellList[spellName] = v 
+		end 
 	end 
 end 
