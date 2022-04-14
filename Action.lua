@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "31.10.2021"
+local DateTime 														= "14.04.2022"
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -144,7 +144,27 @@ local Localization = {
 		CLOSE = "Close",
 		APPLY = "Apply",
 		UPGRADEDFROM = "upgraded from ",
-		UPGRADEDTO = " to ",	
+		UPGRADEDTO = " to ",
+		PROFILESESSION = {
+			BUTTON = "Profile Session\nLeft click opens user panel\nRight click opens development panel",
+			EXPIREDMESSAGE = "Your subscription for %s is expired!\nPlease contact profile developer!",
+			AUTHMESSAGE = "Thank you for using premium profile\nTo authorize your key please contact profile developer!", 
+			AUTHORIZED = "Your key is authorized!",
+			REMAINING = "[%s] remains %d secs",
+			DISABLED = "[%s] |cffff0000expired session!|r",
+			PROFILE = "Profile:",
+			TRIAL = "(trial)",
+			FULL = "(premium)",
+			UNKNOWN = "(not authorized)",
+			DEVELOPMENTPANEL = "Development",
+			USERPANEL = "User",
+			PROJECTNAME = "Project Name",
+			PROJECTNAMETT = "Your development/project/routines/brand name",
+			SECUREWORD = "Secure Word",
+			SECUREWORDTT = "Your secured word as master password to project name",
+			KEYTT = "'dev_key' used in ProfileSession:Setup('dev_key', {...})",
+			KEYTTUSER = "Send this key to profile author!",
+		},		
 		SLASH = {
 			LIST = "List of slash commands:",
 			OPENCONFIGMENU = "shows config menu",
@@ -675,6 +695,26 @@ local Localization = {
 		APPLY = "Применить",
 		UPGRADEDFROM = "обновлен с ",
 		UPGRADEDTO = " до ",	
+		PROFILESESSION = {
+			BUTTON = "Сессия профиля\nЛевый щелчок открывает панель пользователя\nПравый щелчок открывает панель разработки",
+			EXPIREDMESSAGE = "Ваша подписка на %s истекла!\nПожалуйста, обратитесь к разработчику профиля!",
+			AUTHMESSAGE = "Спасибо за использование премиум профиля\nДля авторизации вашего ключа, пожалуйста, обратитесь к разработчику профиля!",
+			AUTHORIZED = "Ваш ключ авторизован!",
+			REMAINING = "[%s] осталось %d сек.",
+			DISABLED = "[%s] |cffff0000истекла сессия!|r",
+			PROFILE = "Профиль:",
+			TRIAL = "(пробный)",
+			FULL = "(премиум)",
+			UNKNOWN = "(не авторизован)",
+			DEVELOPMENTPANEL = "Разработка",
+			USERPANEL = "Пользователь",
+			PROJECTNAME = "Имя Проекта",
+			PROJECTNAMETT = "Ваша разработка/проект/рутины/бренд название",
+			SECUREWORD = "Кодовое Слово",
+			SECUREWORDTT = "Ваше кодовое слово как мастер пароль к имени проекта",
+			KEYTT = "'dev_key' используется в ProfileSession:Setup('dev_key', {...})",		
+			KEYTTUSER = "Отошлите этот ключ автору профиля!",
+		},
 		SLASH = {
 			LIST = "Список слеш команд:",
 			OPENCONFIGMENU = "открыть конфиг меню",
@@ -1207,6 +1247,26 @@ local Localization = {
 		APPLY = "Anwenden",
 		UPGRADEDFROM = "aktualisiert von ",
 		UPGRADEDTO = " zu ",
+		PROFILESESSION = {
+			BUTTON = "Profilsitzung\nLinksklick öffnet das Benutzerpanel\nRechtsklick öffnet das Entwicklungsfenster",
+			EXPIREDMESSAGE = "Ihr Abonnement für %s ist abgelaufen!\nBitte wenden Sie sich an den Profilentwickler!",
+			AUTHMESSAGE = "Vielen Dank, dass Sie das Premium-Profil verwenden\nUm Ihren Schlüssel zu autorisieren, wenden Sie sich bitte an den Profilentwickler!", 
+			AUTHORIZED = "Ihr Schlüssel ist berechtigt!",
+			REMAINING = "[%s] bleibt %d Sekunden",
+			DISABLED = "[%s] |cffff0000Abgelaufene Sitzung!|r",
+			PROFILE = "Profil:",
+			TRIAL = "(testversion)",
+			FULL = "(prämie)",
+			UNKNOWN = "(nicht berechtigt)",
+			DEVELOPMENTPANEL = "Entwicklung",
+			USERPANEL = "Benutzer",
+			PROJECTNAME = "Projektname",
+			PROJECTNAMETT = "Ihre Entwicklung/Projekt/Routinen/Markenname",
+			SECUREWORD = "Sicheres Wort",
+			SECUREWORDTT = "Ihr gesichertes Wort als Master-Passwort zum Projektnamen",
+			KEYTT = "'dev_key' benutzt in ProfileSession:Setup('dev_key', {...})",	
+			KEYTTUSER = "Senden Sie diesen Schlüssel an den Autor des Profils!",			
+		},
 		SLASH = {
 			LIST = "Liste der Slash-Befehle:",
 			OPENCONFIGMENU = "Menü Öffnen",
@@ -1739,6 +1799,26 @@ local Localization = {
 		APPLY = "Appliquer",
 		UPGRADEDFROM = "mise à niveau depuis ",
 		UPGRADEDTO = " à ",
+		PROFILESESSION = {
+			BUTTON = "Séance de profil\nUn clic gauche ouvre le panneau utilisateur\nUn clic droit ouvre le panneau de développement",
+			EXPIREDMESSAGE = "Votre abonnement pour %s a expiré!\nVeuillez contacter le développeur du profil!",
+			AUTHMESSAGE = "Merci d'utiliser le profil premium\nPour autoriser votre clé, veuillez contacter le développeur de profil!", 
+			AUTHORIZED = "Votre clé est autorisée!",
+			REMAINING = "[%s] reste %d secondes",
+			DISABLED = "[%s] |cffff0000session expirée!|r",
+			PROFILE = "Profil:",
+			TRIAL = "(essai)",
+			FULL = "(prime)",
+			UNKNOWN = "(pas autorisé)",
+			DEVELOPMENTPANEL = "Développement",
+			USERPANEL = "Utilisateur",
+			PROJECTNAME = "Nom du Projet",
+			PROJECTNAMETT = "Votre développement/projet/routines/nom de marque",
+			SECUREWORD = "Mot Sécurisé",
+			SECUREWORDTT = "Votre mot sécurisé comme mot de passe principal pour le nom du projet",
+			KEYTT = "'dev_key' utilisé dans ProfileSession:Setup('dev_key', {...})",
+			KEYTTUSER = "Envoyer cette clé à l'auteur du profil!",
+		},
 		SLASH = {
 			LIST = "Liste des commandes slash:",
 			OPENCONFIGMENU = "Voir le menu de configuration",
@@ -2269,6 +2349,26 @@ local Localization = {
 		APPLY = "Applicare",
 		UPGRADEDFROM = "aggiornato da ",
 		UPGRADEDTO = " per ",	
+		PROFILESESSION = {
+			BUTTON = "Sessione di profilo\nIl clic sinistro apre il pannello utente\nFare clic con il pulsante destro del mouse apre il pannello di sviluppo",
+			EXPIREDMESSAGE = "Il tuo abbonamento a %s è scaduto!\nSi prega di contattare lo sviluppatore del profilo!",
+			AUTHMESSAGE = "Grazie per aver utilizzato il profilo premium\nPer autorizzare la tua chiave contatta lo sviluppatore del profilo!", 
+			AUTHORIZED = "La tua chiave è autorizzata!",
+			REMAINING = "[%s] rimane %d sec",
+			DISABLED = "[%s] |cffff0000sessione scaduta!|r",
+			PROFILE = "Profilo:",
+			TRIAL = "(prova)",
+			FULL = "(premio)",
+			UNKNOWN = "(non autorizzato)",
+			DEVELOPMENTPANEL = "Sviluppo",
+			USERPANEL = "Utente",
+			PROJECTNAME = "Nome del Progetto",
+			PROJECTNAMETT = "Il tuo sviluppo/progetto/routine/marchio",
+			SECUREWORD = "Parola Sicura",
+			SECUREWORDTT = "La tua parola protetta come password principale per il nome del progetto",
+			KEYTT = "'dev_key' usato in ProfileSession:Setup('dev_key', {...})",
+			KEYTTUSER = "Invia questa chiave all'autore del profilo!",
+		},
 		SLASH = {
 			LIST = "Lista comandi:",
 			OPENCONFIGMENU = "mostra il menu di configurazione",
@@ -2801,6 +2901,26 @@ local Localization = {
 		APPLY = "Aplicar",
 		UPGRADEDFROM = "actualizado de ",
 		UPGRADEDTO = " a ",	
+		PROFILESESSION = {
+			BUTTON = "Sesión de perfil\nEl clic izquierdo abre el panel de usuario\nEl clic derecho abre el panel de desarrollo",
+			EXPIREDMESSAGE = "¡Tu suscripción para %s ha caducado!\n¡Por favor, póngase en contacto con el desarrollador del perfil!",
+			AUTHMESSAGE = "Gracias por usar el perfil premium\nPara autorizar su clave, póngase en contacto con el desarrollador del perfil!",
+			AUTHORIZED = "Su clave está autorizada!",			
+			REMAINING = "[%s] permanece %d segundos",
+			DISABLED = "[%s] |cffff0000sesión expirada!|r",
+			PROFILE = "Perfil:",
+			TRIAL = "(ensayo)",
+			FULL = "(la prima)",
+			UNKNOWN = "(no autorizado)",
+			DEVELOPMENTPANEL = "Desarrollo",
+			USERPANEL = "Usuario",
+			PROJECTNAME = "Nombre del Proyecto",
+			PROJECTNAMETT = "Tu desarrollo/proyecto/rutinas/nombre de marca",
+			SECUREWORD = "Palabra Segura",
+			SECUREWORDTT = "Su palabra segura como contraseña maestra para el nombre del proyecto",
+			KEYTT = "'dev_key' utilizado en ProfileSession:Setup('dev_key', {...})",
+			KEYTTUSER = "Enviar esta clave al autor del perfil!",
+		},
 		SLASH = {
 			LIST = "Lista de comandos:",
 			OPENCONFIGMENU = "Mostrar menú de configuración",
@@ -3331,6 +3451,26 @@ local Localization = {
 		APPLY = "Aplicar",
 		UPGRADEDFROM = "Melhorado de ",
 		UPGRADEDTO = " para ",		
+		PROFILESESSION = {
+			BUTTON = "Sessão de perfil\nClique esquerdo abre o painel do usuário\nClique com o botão direito para abrir o painel de desenvolvimento",
+			EXPIREDMESSAGE = "Sua assinatura para %s expirou!\nEntre em contato com o desenvolvedor do perfil!",
+			AUTHMESSAGE = "Obrigado por usar o perfil premium\nPara autorizar sua chave, entre em contato com o desenvolvedor do perfil!", 
+			AUTHORIZED = "Sua chave está autorizada!",		
+			REMAINING = "[%s] permanece %d segundos",
+			DISABLED = "[%s] |cffff0000sessão expirada!|r",
+			PROFILE = "Perfil:",
+			TRIAL = "(julgamento)",
+			FULL = "(prêmio)",
+			UNKNOWN = "(não autorizado)",
+			DEVELOPMENTPANEL = "Desenvolvimento",
+			USERPANEL = "Do utilizador",
+			PROJECTNAME = "Nome do Projeto",
+			PROJECTNAMETT = "Seu desenvolvimento/projeto/rotinas/nome da marca",
+			SECUREWORD = "Palavra Segura",
+			SECUREWORDTT = "Sua palavra segura como senha mestra para o nome do projeto",
+			KEYTT = "'dev_key' usado em ProfileSession:Setup('dev_key', {...})",
+			KEYTTUSER = "Envie esta chave para o autor do perfil!",
+		},
 		SLASH = {
 			LIST = "Lista de comandos:",
 			OPENCONFIGMENU = "exibe o menu de configurações",
@@ -4208,7 +4348,6 @@ local Factory = {
 				[2645] = "Ghost Wolf",
 				-- Mage 
 				[118] = "Pollymorph",
-				[28270] = "Polymorph: Cow",
 				-- Priest 
 				[605] = "Mind Control",
 				[9484] = "Shackle Undead",
@@ -4430,8 +4569,6 @@ local GlobalFactory = {
 				[22335] = {},
 				-- Brood Affliction: Green
 				[23169] = {},
-				-- Copy of Poison Bolt Volley
-				[29169] = { enabled = false }, 
 				-- Corrosive Poison 
 				[13526] = {},
 				-- Corrosive Venom Spit
@@ -4827,8 +4964,6 @@ local GlobalFactory = {
 				[118] = { dur = 1.5 },
 				-- Mage: Polymorph: Sheep 
 				[851] = { dur = 1.5 },
-				-- Mage: Polymorph: Cow 
-				[28270] = { dur = 1.5 },
 				-- Mage: Polymorph: Turtle 
 				[28271] = { dur = 1.5 },
 				-- Mage: Polymorph: Pig 
@@ -5142,8 +5277,30 @@ local Upgrade 					= {
 				PvPTargetMouseover = true,
 			}, "pActionDB[4]")
 		end,
+		[2]						= function()
+			tEraseKeys(pActionDB[4].PvP, { 
+				["GameLocale"] = {
+					-- Mage: Polymorph: Cow 
+					[28270] = true,
+				},
+			}, "pActionDB[4].PvP")
+		end,
 	},
 	gUpgrades					= {
+		[1]						= function()
+			tEraseKeys(gActionDB[5].PvP, { 
+				Magic = {
+					-- Mage: Polymorph: Cow 
+					[28270] = true,
+				},
+			}, "gActionDB[5].PvP")
+			tEraseKeys(gActionDB[5].PvE, { 
+				Poison = {
+					-- Copy of Poison Bolt Volley
+					[29169] = true,
+				},
+			}, "gActionDB[5].PvE")
+		end,
 	},
 	pUpgradesForProfile			= {},
 	SortMethod					= function(a, b)
@@ -9297,23 +9454,51 @@ function Action.ToggleMainUI()
 			end 
 		end)
 		
-		MainUI.Session = StdUi:Subtitle(MainUI, L["TAB"]["SESSION"] .. Action.GetSession())
-		MainUI.Session:SetFontSize(select(2, MainUI.Session:GetFont()) * 1.05)
-		MainUI.Session.OnTimerTick = function() 			
+		MainUI.Session = StdUi:Subtitle(MainUI, L["TAB"]["SESSION"])
+		MainUI.Session.OnTimerTick = function()		
 			local remain, isStop = Action.GetSession()
-			MainUI.Session:SetText(L["TAB"]["SESSION"] .. remain)
-			if isStop then 
+			local remain_profile, remain_profile_secs, userStatus, profileName, locales = Action.ProfileSession:GetSession()
+			if profileName then 
+				if MainUI.Session.fontHeight ~= "compact" then 
+					MainUI.Session.fontHeight = "compact"
+					MainUI.Session:SetFontSize( select(2, MainUI.Session:GetFont()) * 1.015 )
+				end
+				
+				userStatus 	  = userStatus or "UNKNOWN"
+				local CL 	  = Action.GetCL()
+				local STATUS  = locales and locales[userStatus] and (locales[userStatus][CL] or locales[userStatus].enUS) or L["PROFILESESSION"][userStatus]
+				--local PROFILE = locales and locales.PROFILE and (locales.PROFILE[CL] or locales.PROFILE.enUS) or L["PROFILESESSION"]["PROFILE"]
+				--MainUI.Session:SetText(L["TAB"]["SESSION"]:join(remain, (" | %s %s %s"):format(PROFILE, remain_profile, STATUS)))
+				MainUI.Session:SetText(strjoin("", L["TAB"]["SESSION"], remain, (" | %s %s"):format(remain_profile, STATUS)))
+			else 
+				if MainUI.Session.fontHeight ~= "normal" then 
+					MainUI.Session.fontHeight = "normal"
+					MainUI.Session:SetFontSize( select(2, MainUI.Session:GetFont()) * 1.05 )
+				end 
+				
+				MainUI.Session:SetText(strjoin("", L["TAB"]["SESSION"], remain))
+			end 
+			if isStop and remain_profile_secs == 0 then 
 				Action.TimerDestroy("Session")
 			end 
 		end		
 		StdUi:GlueTop(MainUI.Session, MainUI, 11, -10, "LEFT")
 		MainUI:HookScript("OnShow", function(self)
+			if MainUI.ProfileSession.UI.lastState then 
+				MainUI.ProfileSession.UI.lastState = nil 
+				MainUI.ProfileSession.UI:Switch(MainUI.ProfileSession.UI.mouse_button)
+			end 
 			MainUI.Session.OnTimerTick()
 			Action.TimerSetTicker("Session", 0.5, MainUI.Session.OnTimerTick)
 		end)
 		MainUI:HookScript("OnHide", function(self)
+			if MainUI.ProfileSession.UI:IsShown() then
+				MainUI.ProfileSession.UI.lastState = "shown"
+				MainUI.ProfileSession.UI:Switch()
+			end 
 			Action.TimerDestroy("Session")
 		end)
+		MainUI.Session.OnTimerTick()
 		Action.TimerSetTicker("Session", 0.5, MainUI.Session.OnTimerTick)
 		
 		MainUI.PDateTime = StdUi:Subtitle(MainUI, Action.Data.ProfileUI.DateTime or "")
@@ -9391,6 +9576,19 @@ function Action.ToggleMainUI()
 		end)
 		StdUi:FrameTooltip(MainUI.AllReset, L["TAB"]["RESETBUTTON"], nil, "TOP", true)	
 		StdUi:GlueLeft(MainUI.AllReset, MainUI.Profiles, -1, 0)
+		
+		MainUI.ProfileSession = StdUi:SquareButton(MainUI, MainUI.closeBtn:GetWidth(), MainUI.Profiles:GetHeight())	
+		MainUI.ProfileSession:SetBackdropColor(0, 0, 0, 0)		
+		MainUI.ProfileSession:SetBackdropBorderColor(0, 0, 0, 0)		
+		MainUI.ProfileSession:SetIcon([[Interface\Buttons\UI-GuildButton-PublicNote-Up]], MainUI.closeBtn:GetWidth(), MainUI.Profiles:GetHeight(), true)	
+		MainUI.ProfileSession:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		MainUI.ProfileSession:SetScript("OnClick", function(this, button)
+			this.UI.lastButton = button
+			this.UI:Switch(button)
+		end)
+		MainUI.ProfileSession.UI = Action.ProfileSession.UI
+		StdUi:FrameTooltip(MainUI.ProfileSession, L["PROFILESESSION"]["BUTTON"], nil, "TOP", true)	
+		StdUi:GlueLeft(MainUI.ProfileSession, MainUI.AllReset, -1, 0)
 		
 		MainUI.ResetQuestion = StdUi:Window(MainUI, 350, 270, L["TAB"]["RESETQUESTION"])
 		MainUI.ResetQuestion:SetPoint("CENTER")
@@ -9785,6 +9983,10 @@ function Action.ToggleMainUI()
 				Action.GetLocalization()	
 				
 				MainUI.AllReset.stdUiTooltip:SetText(L["TAB"]["RESETBUTTON"])
+				MainUI.ProfileSession.stdUiTooltip:SetText(L["PROFILESESSION"]["BUTTON"])
+				if MainUI.ProfileSession.UI:IsShown() then 
+					MainUI.ProfileSession.UI:Switch(MainUI.ProfileSession.UI.lastButton)
+				end 
 				MainUI.GDateTime:SetText(L["GLOBALAPI"] .. DateTime)
 				MainUI.ResetQuestion.titlePanel.label:SetText(L["TAB"]["RESETQUESTION"])				
 				MainUI.Yes.text:SetText(L["YES"])
