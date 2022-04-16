@@ -367,7 +367,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			for dev_key, dev_config in pairs(private.data) do 
 				local my_key = private:GetUserKey(dev_key)
 				local my_config = rawget(dev_config.users, my_key) or rawget(dev_config.users, "*")
-				if my_config and rawget(my_config.profiles, current_profile) then 
+				if my_config and rawget(my_config, profiles) and rawget(my_config.profiles, current_profile) then 
 					local expiration = my_config.expiration
 					local expiration_seconds = private:GetDate(expiration, current_seconds)
 					local isTrial = expiration:find("%l%l%l%l%l%-")
@@ -536,21 +536,23 @@ function ProfileSession:Setup(dev_key, dev_config, useTrialReset)
 		
 		for profileName, profileStatus in pairs(user_config.profiles) do 
 			local profile = TMW_db_profiles[profileName]
-			assert(type(profileName) == "string" and profile, format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] must be valid profile name!", toStr(dev_key), toStr(user_key), toStr(profileName)))
-			assert(type(profileStatus) == "boolean", format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] = '%s' is incorrect format or type!", toStr(dev_key), toStr(user_key), toStr(profileName), toStr(profileStatus or "nil")))
-			
-			local raw_profileStatus = rawget(config_users[user_key].profiles, profileName)
-			if raw_profileStatus == nil then 
-				config_users[user_key].profiles[profileName] = profileStatus
+			if profile then 
+				assert(type(profileName) == "string" and profile, format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] must be valid profile name!", toStr(dev_key), toStr(user_key), toStr(profileName)))
+				assert(type(profileStatus) == "boolean", format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] = '%s' is incorrect format or type!", toStr(dev_key), toStr(user_key), toStr(profileName), toStr(profileStatus or "nil")))
 				
-				assert(private.affected_profiles[profileName] == nil or private.affected_profiles[profileName] == dev_key, format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] this profile has been signed by another '%s' dev_key!", toStr(dev_key), toStr(user_key), toStr(profileName), toStr(private.affected_profiles[profileName]))) 
-				private.affected_profiles[profileName] = dev_key
-				profile.signature = profileName
-			end 
-			
-			if useTrialReset and profile.trial and private.affected_profiles[profileName] == dev_key then 
-				profile.trial = nil
-				Print(format("Trial was successfully reseted on %s (%s)!", profileName, toStr(dev_key)))
+				local raw_profileStatus = rawget(config_users[user_key].profiles, profileName)
+				if raw_profileStatus == nil then 
+					config_users[user_key].profiles[profileName] = profileStatus
+					
+					assert(private.affected_profiles[profileName] == nil or private.affected_profiles[profileName] == dev_key, format("dev_key: '%s'\ndev_config.users['%s'].profiles['%s'] this profile has been signed by another '%s' dev_key!", toStr(dev_key), toStr(user_key), toStr(profileName), toStr(private.affected_profiles[profileName]))) 
+					private.affected_profiles[profileName] = dev_key
+					profile.signature = profileName
+				end 
+				
+				if useTrialReset and profile.trial and private.affected_profiles[profileName] == dev_key then 
+					profile.trial = nil
+					Print(format("Trial was successfully reseted on %s (%s)!", profileName, toStr(dev_key)))
+				end 
 			end 
 		end 
 	end 
