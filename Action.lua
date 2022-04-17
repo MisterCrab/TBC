@@ -9466,7 +9466,7 @@ function Action.ToggleMainUI()
 				
 				userStatus 	  = userStatus or "UNKNOWN"
 				local CL 	  = Action.GetCL()
-				local STATUS  = locales and locales[userStatus] and (locales[userStatus][CL] or locales[userStatus].enUS) or L["PROFILESESSION"][userStatus]
+				local STATUS  = locales[userStatus] and (locales[userStatus][CL] or locales[userStatus].enUS) or L["PROFILESESSION"][userStatus]
 				--local PROFILE = locales and locales.PROFILE and (locales.PROFILE[CL] or locales.PROFILE.enUS) or L["PROFILESESSION"]["PROFILE"]
 				--MainUI.Session:SetText(L["TAB"]["SESSION"]:join(remain, (" | %s %s %s"):format(PROFILE, remain_profile, STATUS)))
 				MainUI.Session:SetText(strjoin("", L["TAB"]["SESSION"], remain, (" | %s %s"):format(remain_profile, STATUS)))

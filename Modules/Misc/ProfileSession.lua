@@ -66,9 +66,23 @@ local blake3				= Utils.blake3
 local metatable; metatable = {
 	__index = function(t, k)
 		if rawget(t, k) == nil then 
-			rawset(t, k, setmetatable({}, metatable))
-			return t[k]
+			if metatable[k] then 
+				return metatable[k]
+			else 
+				rawset(t, k, setmetatable({}, metatable))
+				return t[k]
+			end 
 		end
+	end,
+	__unlink = function(t)
+		for _, v in pairs(t) do 
+			if type(v) == "table" and getmetatable(v) then 
+				v:__unlink()
+			end 
+		end 
+		if getmetatable(t) then 
+			setmetatable(t, nil)
+		end 
 	end,
 }
 local private = {
@@ -117,7 +131,7 @@ function private:RunSession()
 
 		private.timerObj.func = function(this, counter)
 			local counter = counter or this._remainingIterations 
-			local REMAINING = (self.locale and (self.locale.REMAINING[GetCL()] or self.locale.REMAINING["enUS"])) or GetLocalization().PROFILESESSION.REMAINING
+			local REMAINING = (self.locales.REMAINING and (self.locales.REMAINING[GetCL()] or self.locales.REMAINING["enUS"])) or GetLocalization().PROFILESESSION.REMAINING
 			Print(format(REMAINING, private.profile or A.CurrentProfile, counter))
 		end
 		
@@ -137,7 +151,7 @@ function private:CancelSession(isCallback)
 	local timerObj = self.timerObj
 	if timerObj and not timerObj:IsCancelled() then
 		if not isCallback then 
-			local DISABLED = (self.locale and (self.locale.DISABLED[GetCL()] or self.locale.DISABLED["enUS"])) or GetLocalization().PROFILESESSION.DISABLED
+			local DISABLED = (self.locales.DISABLED and (self.locales.DISABLED[GetCL()] or self.locales.DISABLED["enUS"])) or GetLocalization().PROFILESESSION.DISABLED
 			Print(format(DISABLED, self.profile))
 		end 
 		
@@ -189,37 +203,37 @@ do -- create UI
 			
 			local L = GetLocalization()
 			local CL = GetCL()
-			local CUSTOM = private.locale 
+			local CUSTOM = private.locales 
 			
 			local panel = mouse_button == "LeftButton" and self.panelUser or self.panelDev
 			if mouse_button == "RightButton" then 
-				panel.titlePanel.label:SetText((CUSTOM and (CUSTOM.DEVELOPMENTPANEL[CL] or CUSTOM.DEVELOPMENTPANEL["enUS"])) or L.PROFILESESSION.DEVELOPMENTPANEL)
+				panel.titlePanel.label:SetText((CUSTOM.DEVELOPMENTPANEL and (CUSTOM.DEVELOPMENTPANEL[CL] or CUSTOM.DEVELOPMENTPANEL["enUS"])) or L.PROFILESESSION.DEVELOPMENTPANEL)
 				
-				panel.input_name.subtitle:SetText((CUSTOM and (CUSTOM.PROJECTNAME[CL] or CUSTOM.PROJECTNAME["enUS"])) or L.PROFILESESSION.PROJECTNAME)
-				panel.input_name.stdUiTooltip.text:SetText((CUSTOM and (CUSTOM.PROJECTNAMETT[CL] or CUSTOM.PROJECTNAMETT["enUS"])) or L.PROFILESESSION.PROJECTNAMETT)
-				panel.input_secureword.subtitle:SetText((CUSTOM and (CUSTOM.SECUREWORD[CL] or CUSTOM.SECUREWORD["enUS"])) or L.PROFILESESSION.SECUREWORD)
-				panel.input_secureword.stdUiTooltip.text:SetText((CUSTOM and (CUSTOM.SECUREWORDTT[CL] or CUSTOM.SECUREWORDTT["enUS"])) or L.PROFILESESSION.SECUREWORDTT)
-				panel.output.stdUiTooltip.text:SetText((CUSTOM and (CUSTOM.KEYTT[CL] or CUSTOM.KEYTT["enUS"])) or L.PROFILESESSION.KEYTT)
+				panel.input_name.subtitle:SetText((CUSTOM.PROJECTNAME and (CUSTOM.PROJECTNAME[CL] or CUSTOM.PROJECTNAME["enUS"])) or L.PROFILESESSION.PROJECTNAME)
+				panel.input_name.stdUiTooltip.text:SetText((CUSTOM.PROJECTNAMETT and (CUSTOM.PROJECTNAMETT[CL] or CUSTOM.PROJECTNAMETT["enUS"])) or L.PROFILESESSION.PROJECTNAMETT)
+				panel.input_secureword.subtitle:SetText((CUSTOM.SECUREWORD and (CUSTOM.SECUREWORD[CL] or CUSTOM.SECUREWORD["enUS"])) or L.PROFILESESSION.SECUREWORD)
+				panel.input_secureword.stdUiTooltip.text:SetText((CUSTOM.SECUREWORDTT and (CUSTOM.SECUREWORDTT[CL] or CUSTOM.SECUREWORDTT["enUS"])) or L.PROFILESESSION.SECUREWORDTT)
+				panel.output.stdUiTooltip.text:SetText((CUSTOM.KEYTT and (CUSTOM.KEYTT[CL] or CUSTOM.KEYTT["enUS"])) or L.PROFILESESSION.KEYTT)
 				panel.OnInput(panel.output, true) --> emulating human's input to dev_key in output
 			else 
-				panel.titlePanel.label:SetText((CUSTOM and (CUSTOM.USERPANEL[CL] or CUSTOM.USERPANEL["enUS"])) or L.PROFILESESSION.USERPANEL)
+				panel.titlePanel.label:SetText((CUSTOM.USERPANEL and (CUSTOM.USERPANEL[CL] or CUSTOM.USERPANEL["enUS"])) or L.PROFILESESSION.USERPANEL)
 				
 				if private.status then --> authorized
 					if private.session == 0 then --> expired
-						panel.message:SetText(format((CUSTOM and (CUSTOM.EXPIREDMESSAGE[CL] or CUSTOM.EXPIREDMESSAGE["enUS"])) or L.PROFILESESSION.EXPIREDMESSAGE, private.profile or A.CurrentProfile))
+						panel.message:SetText(format((CUSTOM.EXPIREDMESSAGE and (CUSTOM.EXPIREDMESSAGE[CL] or CUSTOM.EXPIREDMESSAGE["enUS"])) or L.PROFILESESSION.EXPIREDMESSAGE, private.profile or A.CurrentProfile))
 					else --> everything is ok e.g. key is authorized 
-						panel.message:SetText((CUSTOM and (CUSTOM.AUTHORIZED[CL] or CUSTOM.AUTHORIZED["enUS"])) or L.PROFILESESSION.AUTHORIZED)
+						panel.message:SetText((CUSTOM.AUTHORIZED and (CUSTOM.AUTHORIZED[CL] or CUSTOM.AUTHORIZED["enUS"])) or L.PROFILESESSION.AUTHORIZED)
 					end 
 				else --> not authorized
-					panel.message:SetText((CUSTOM and (CUSTOM.AUTHMESSAGE[CL] or CUSTOM.AUTHMESSAGE["enUS"])) or L.PROFILESESSION.AUTHMESSAGE)
+					panel.message:SetText((CUSTOM.AUTHMESSAGE and (CUSTOM.AUTHMESSAGE[CL] or CUSTOM.AUTHMESSAGE["enUS"])) or L.PROFILESESSION.AUTHMESSAGE)
 				end 	
 				
 				panel.output:SetText(private:GetUserKey(private.affected_profiles[private.profile]) or "Use ProfileSession:Setup(key,config) to get key here")
-				panel.output.stdUiTooltip.text:SetText((CUSTOM and (CUSTOM.KEYTTUSER[CL] or CUSTOM.KEYTTUSER["enUS"])) or L.PROFILESESSION.KEYTTUSER)
+				panel.output.stdUiTooltip.text:SetText((CUSTOM.KEYTTUSER and (CUSTOM.KEYTTUSER[CL] or CUSTOM.KEYTTUSER["enUS"])) or L.PROFILESESSION.KEYTTUSER)
 			end 
 			
-			panel.output.subtitle:SetText(CUSTOM and CUSTOM.KEY and (CUSTOM.KEY[CL] or CUSTOM.KEY["enUS"]) or L.TAB.KEY)
-			panel.button_close:SetText(CUSTOM and CUSTOM.CLOSE and (CUSTOM.CLOSE[CL] or CUSTOM.CLOSE["enUS"]) or L.CLOSE)
+			panel.output.subtitle:SetText(CUSTOM.KEY and (CUSTOM.KEY[CL] or CUSTOM.KEY["enUS"]) or L.TAB.KEY)
+			panel.button_close:SetText(CUSTOM.CLOSE and (CUSTOM.CLOSE[CL] or CUSTOM.CLOSE["enUS"]) or L.CLOSE)
 			panel:DoLayout()
 			panel:SetHeight(math_abs(select(5, panel.button_close:GetPoint())) + panel.button_close:GetHeight() + 10)
 			
@@ -384,6 +398,10 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 					end 
 					
 					private.locales = rawget(dev_config, "locales")
+					if private.locales then 
+						private.locales:__unlink()
+					end 
+					
 					if private.session > 0 and current_profile == A.CurrentProfile and not private.disabled_profiles[A.CurrentProfile] then
 						private.expiration = current_seconds + private.session
 						private:RunSession()
