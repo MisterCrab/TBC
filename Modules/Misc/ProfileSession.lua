@@ -82,6 +82,7 @@ local metatable; metatable = {
 		end 
 		if getmetatable(t) then 
 			setmetatable(t, nil)
+			t.isUnlinked = true 
 		end 
 	end,
 }
@@ -379,6 +380,11 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			-- Enable 
 			local current_seconds = Server:GetTimeInSeconds() --> current UTC time in seconds 
 			for dev_key, dev_config in pairs(private.data) do 
+				private.locales = rawget(dev_config, "locales") or private.locales
+				if private.locales and not private.locales.isUnlinked then 
+					private.locales:__unlink()
+				end 			
+			
 				local my_key = private:GetUserKey(dev_key)
 				local my_config = rawget(dev_config.users, my_key) or rawget(dev_config.users, "*")
 				if my_config and rawget(my_config, "profiles") and rawget(my_config.profiles, current_profile) then 
@@ -395,11 +401,6 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 					else 
 						private.status = "FULL"
 						private.session = math_max(expiration_seconds - current_seconds, 0)
-					end 
-					
-					private.locales = rawget(dev_config, "locales")
-					if private.locales then 
-						private.locales:__unlink()
 					end 
 					
 					if private.session > 0 and current_profile == A.CurrentProfile and not private.disabled_profiles[A.CurrentProfile] then
