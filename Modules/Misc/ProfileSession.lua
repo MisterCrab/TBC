@@ -383,7 +383,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 						private.session = math_max(expiration_seconds - current_seconds, 0)
 					end 
 					
-					private.locales = rawget(dev_config, locales)
+					private.locales = rawget(dev_config, "locales")
 					if private.session > 0 and current_profile == A.CurrentProfile and not private.disabled_profiles[A.CurrentProfile] then
 						private.expiration = current_seconds + private.session
 						private:RunSession()
@@ -530,7 +530,7 @@ function ProfileSession:Setup(dev_key, dev_config, useTrialReset)
 		
 		local raw_expiration = rawget(config_users, user_key)
 		assert(raw_expiration == nil or raw_expiration ~= user_config.expiration, format("dev_key: '%s'\ndev_config.users['%s'].expiration = '%s' already written expiration doesn't match new expiration '%s'.", toStr(dev_key), toStr(user_key), toStr(raw_expiration), toStr(user_config.expiration)))
-		if rawget(config_users[user_key], expiration) == nil then
+		if rawget(config_users[user_key], "expiration") == nil then
 			config_users[user_key].expiration = user_config.expiration
 		end 
 		
