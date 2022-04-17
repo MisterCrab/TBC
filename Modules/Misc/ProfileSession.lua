@@ -367,7 +367,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			for dev_key, dev_config in pairs(private.data) do 
 				local my_key = private:GetUserKey(dev_key)
 				local my_config = rawget(dev_config.users, my_key) or rawget(dev_config.users, "*")
-				if my_config and rawget(my_config, profiles) and rawget(my_config.profiles, current_profile) then 
+				if my_config and rawget(my_config, "profiles") and rawget(my_config.profiles, current_profile) then 
 					local expiration = my_config.expiration
 					local expiration_seconds = private:GetDate(expiration, current_seconds)
 					local isTrial = expiration:find("%l%l%l%l%l%-")
