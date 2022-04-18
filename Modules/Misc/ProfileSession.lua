@@ -381,7 +381,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			local current_seconds = Server:GetTimeInSeconds() --> current UTC time in seconds 
 			for dev_key, dev_config in pairs(private.data) do 
 				private.locales = rawget(dev_config, "locales") or private.locales
-				if private.locales and not private.locales.isUnlinked then 
+				if private.locales and not rawget(private.locales, "isUnlinked") then 
 					private.locales:__unlink()
 				end 			
 			
