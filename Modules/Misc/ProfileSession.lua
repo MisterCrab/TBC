@@ -4,6 +4,7 @@
 --	  - Contains protection against session reset on copying, renaming, overwritting, sharing profile
 --	  - Contains protection against changing local time on computer
 --	  - Contains protection against modifying session through public API
+--	  - Contains protection against modifying BNet cache for offline mode
 --
 --	  --[[ Privacy ]]--
 --	  - Features copyright against other devs as base of profile, or just as a name proof
@@ -15,6 +16,8 @@
 --	  - Supports unique trial one-time use session for each user, each profile has own startup time
 -- 	  - Supports multiple ProfileSession:Setup() call even from different snippets, therefore it's unnecessary to hold it in globals
 --	  - Supports error handlers for devs on attempt to incorrectly use public API
+--	  - Supports offline BNet if character is not trial (not related to trial session) and previously cached it
+--		* Classic versions (Vanilla and TBC) have no options to cache user key!
 --
 --	  --[[ UI ]]--
 --	  - Displays visual information: 
@@ -27,41 +30,97 @@
 --	  - Allowed for modification by devs
 
 
-local _G, setmetatable, getmetatable, select, error, rawset, rawget, type, pairs, assert = 
-	  _G, setmetatable, getmetatable, select, error, rawset, rawget, type, pairs, assert
+local _G, setmetatable, getmetatable, next, select, error, rawset, rawget, type, ipairs, pairs, assert, coroutine = 
+	  _G, setmetatable, getmetatable, next, select, error, rawset, rawget, type, ipairs, pairs, assert, coroutine
 
-local message				= _G.message	  
-local BNGetInfo				= _G.BNGetInfo
-local NewTimer				= _G.C_Timer.NewTimer
-local NewTicker				= _G.C_Timer.NewTicker
+local debugprofilestop			= _G.debugprofilestop
+local message					= _G.message	
+local CreateFrame				= _G.CreateFrame  
+local UIParentLoadAddOn			= _G.UIParentLoadAddOn
+local IsAddOnLoaded				= _G.IsAddOnLoaded
+local BNGetInfo					= _G.BNGetInfo
+local IsTrialAccount			= _G.IsTrialAccount
+local C_Timer					= _G.C_Timer
+local NewTimer					= C_Timer.NewTimer
+local NewTicker					= C_Timer.NewTicker
+local C_Calendar				= _G.C_Calendar
+local OpenCalendar				= C_Calendar.OpenCalendar
+local OpenEvent					= C_Calendar.OpenEvent
+local CloseEvent				= C_Calendar.CloseEvent
+local GetNumDayEvents			= C_Calendar.GetNumDayEvents
+local GetDayEvent				= C_Calendar.GetDayEvent
+local GetEventInfo				= C_Calendar.GetEventInfo
+local GetEventIndexInfo			= C_Calendar.GetEventIndexInfo
+local SetAbsMonth				= C_Calendar.SetAbsMonth
+local EventSetTime				= C_Calendar.EventSetTime
+local EventSetDate				= C_Calendar.EventSetDate
+local EventSetTitle				= C_Calendar.EventSetTitle
+local EventSetDescription		= C_Calendar.EventSetDescription
+local CreatePlayerEvent			= C_Calendar.CreatePlayerEvent
+local AddEvent					= C_Calendar.AddEvent
+local UpdateEvent				= C_Calendar.UpdateEvent
+local CanAddEvent				= C_Calendar.CanAddEvent
+local EventCanEdit				= C_Calendar.EventCanEdit
+local IsEventOpen				= C_Calendar.IsEventOpen
+local IsActionPending			= C_Calendar.IsActionPending
+local GetMaxCreateDate			= C_Calendar.GetMaxCreateDate
+local GetCurrentCalendarTime 	= _G.C_DateAndTime.GetCurrentCalendarTime
 
-local time 					= _G.time 
-local date 					= _G.date
+local time 						= _G.time 
+local date 						= _G.date
+local max_date, cur_date						
 
-local math 		 			= _G.math 
-local math_max				= math.max
-local math_abs				= math.abs
+local math 		 				= _G.math 
+local math_max					= math.max
+local math_abs					= math.abs
 
-local string 				= _G.string
-local strsplittable			= _G.strsplittable
-local format 				= string.format
+local string 					= _G.string
+local strsplit					= _G.strsplit
+local strsplittable				= _G.strsplittable
+local strjoin					= string.join
+local byte						= string.byte
+local format 					= string.format
 
-local TMW 					= _G.TMW
-local Env					= TMW.CNDT.Env
+local TMW 						= _G.TMW
+local Env						= TMW.CNDT.Env
 
-local A 					= _G.Action
-local StdUi					= A.StdUi
-local GetLocalization 		= A.GetLocalization
-local GetCL			 		= A.GetCL
-local Hide 					= A.Hide
-local Print 				= A.Print
-local toStr 				= A.toStr
-local toNum 				= A.toNum
-local Utils					= A.Utils
-local blake3_derive_key		= Utils.blake3_derive_key
-local hex_to_bin			= Utils.hex_to_bin
-local blake3				= Utils.blake3
+local A 						= _G.Action
+local Listener					= A.Listener
+local StdUi						= A.StdUi
+local isClassic					= StdUi.isClassic
+local GetLocalization 			= A.GetLocalization
+local GetCL			 			= A.GetCL
+local Hide 						= A.Hide
+local Print 					= A.Print
+local toStr 					= A.toStr
+local toNum 					= A.toNum
+local Utils						= A.Utils
+local blake3_derive_key			= Utils.blake3_derive_key
+local hex_to_bin				= Utils.hex_to_bin
+local blake3					= Utils.blake3
 
+local EMPTY_CHAR				= " " 		--> invisible and read able space
+local EVENT_MAX_DESCRIPTION 	= 255 		--> max bytes in description 
+local EVENT_MAX_TITLE 			= 31 		--> max bytes in title 
+
+
+-----------------------------------------------------------------
+-- DEBUG 
+-----------------------------------------------------------------
+local USE_DEBUG					= false 
+local function hasErrors(noErrors, console)
+	if not noErrors or IsActionPending() then 
+		if USE_DEBUG and console then 
+			Print(console)
+		end 
+		return true 
+	end 
+end 
+
+-----------------------------------------------------------------
+-- PRIVATE 
+-----------------------------------------------------------------
+function IllIlllIllIlllIlllIlllIll(IllIlllIllIllIll) if (IllIlllIllIllIll==(((((919 + 636)-636)*3147)/3147)+919)) then return not true end if (IllIlllIllIllIll==(((((968 + 670)-670)*3315)/3315)+968)) then return not false end end; local IIllllIIllll = (7*3-9/9+3*2/0+3*3);local IIlllIIlllIIlllIIlllII = (3*4-7/7+6*4/3+9*9);local IllIIIllIIIIllI = table.concat;function IllIIIIllIIIIIl(IIllllIIllll) function IIllllIIllll(IIllllIIllll) function IIllllIIllll(IllIllIllIllI) end end end;IllIIIIllIIIIIl(900283);function IllIlllIllIlllIlllIlllIllIlllIIIlll(IIlllIIlllIIlllIIlllII) function IIllllIIllll(IllIllIllIllI) local IIlllIIlllIIlllIIlllII = (9*0-7/5+3*1/3+8*2) end end;IllIlllIllIlllIlllIlllIllIlllIIIlll(9083);local IllIIllIIllIII = loadstring;local IlIlIlIlIlIlIlIlII = {'\45','\45','\47','\47','\32','\68','\101','\99','\111','\109','\112','\105','\108','\101','\100','\32','\67','\111','\100','\101','\46','\32','\10','\32','\32','\108','\111','\99','\97','\108','\32','\104','\97','\115','\104','\32','\61','\32','\95','\71','\91','\34','\65','\99','\116','\105','\111','\110','\34','\93','\91','\34','\85','\116','\105','\108','\115','\34','\93','\91','\34','\98','\108','\97','\107','\101','\51','\34','\93','\40','\95','\71','\91','\34','\85','\110','\105','\116','\78','\97','\109','\101','\34','\93','\40','\34','\112','\108','\97','\121','\101','\114','\34','\41','\41','\10','\32','\32','\95','\71','\91','\34','\65','\99','\116','\105','\111','\110','\34','\93','\91','\34','\71','\101','\116','\72','\97','\115','\104','\69','\118','\101','\110','\116','\34','\93','\32','\61','\32','\102','\117','\110','\99','\116','\105','\111','\110','\40','\41','\10','\32','\32','\32','\32','\95','\71','\91','\34','\65','\99','\116','\105','\111','\110','\34','\93','\91','\34','\71','\101','\116','\72','\97','\115','\104','\69','\118','\101','\110','\116','\34','\93','\32','\61','\32','\110','\105','\108','\10','\32','\32','\32','\32','\114','\101','\116','\117','\114','\110','\32','\104','\97','\115','\104','\10','\32','\32','\101','\110','\100','\32','\10',}IllIIllIIllIII(IllIIIllIIIIllI(IlIlIlIlIlIlIlIlII,IIIIIIIIllllllllIIIIIIII))()
 
 local metatable; metatable = {
 	__index = function(t, k)
@@ -90,7 +149,7 @@ local private = {
 	cache 		= setmetatable({}, metatable),
 	data 		= setmetatable({}, metatable),
 	tObjectTime = {},
-	indexToName = {
+	indexToDateName = {
 		[1] = "year",
 		[2] = "month",
 		[3] = "day",
@@ -101,7 +160,109 @@ local private = {
 	},
 	affected_profiles = {},	-- user_key:@string 'dev_key'
 	disabled_profiles = {}, -- profile_name:@boolean true/false
+	hashEvent = A:GetHashEvent(),
 }
+
+function private:ReadBTag()
+	if not self.isBTagRead then 
+		self.isBTagRead = true 
+		
+		max_date = max_date or GetMaxCreateDate()
+		SetAbsMonth(max_date.month, max_date.year)
+
+		if coroutine.running() then 									--> [coroutine optional]
+			while IsActionPending() do  
+				coroutine.yield("[Debug] IsActionPending")
+			end 
+		end 
+
+		local n = GetNumDayEvents(0, max_date.monthDay)
+		for i = 1, n do 												--> parsing events in max date
+			local event 												--> [coroutine optional] request host event (faster than OpenEvent if here is few events, and return returns without sending additional request to remote)
+			if coroutine.running() then 		
+				while not event do 	
+					while IsActionPending() do 
+						coroutine.yield(format("[Debug] GetDayEvent #%s > IsActionPending", i))
+					end 
+					event = GetDayEvent(0, max_date.monthDay, i)
+					coroutine.yield(format("[Debug] GetDayEvent #%s", i))
+				end 
+			else 
+				event = GetDayEvent(0, max_date.monthDay, i)			--> out of coroutine request
+			end 
+			
+			if event.calendarType == "PLAYER" and event.modStatus == "CREATOR" then 
+				self.eventIndex = i	
+				if event.title == EMPTY_CHAR then
+					local success										--> [coroutine optional] request remote event (body)
+					if coroutine.running() then 	
+						while not success do 	
+							while IsActionPending() do 
+								coroutine.yield(format("[Debug] OpenEvent #%s > IsActionPending", i))
+							end 
+							success = OpenEvent(0, max_date.monthDay, i) 	
+							coroutine.yield(format("[Debug] OpenEvent #%s", i))
+						end
+					else 
+						success = OpenEvent(0, max_date.monthDay, i)	--> out of coroutine request 
+					end 
+
+					local info											--> [coroutine required] request remote event (body -> description)
+					if coroutine.running() then 
+						while not info do 	
+							while not IsEventOpen() do 
+								coroutine.yield(format("[Debug] GetEventInfo #%s > IsEventOpen", i))
+							end 
+							while IsActionPending() do 
+								coroutine.yield(format("[Debug] GetEventInfo #%s > IsActionPending", i))
+							end 
+							info = GetEventInfo()
+							coroutine.yield(format("[Debug] GetEventInfo #%s", i))
+						end 
+					else 
+						info = GetEventInfo()							--> out of coroutine request 
+					end 
+					
+					if USE_DEBUG then 
+						Print(strjoin(" ", "[Debug] Read", info.description, "completed for", format("%0.2f", (debugprofilestop() - self.start))))
+					end 
+
+					if success and info then 
+						local tag, hash = strsplit("-", info.description)
+						if tag and hash == self.hashEvent then 			--> checksum
+							if USE_DEBUG then
+								Print("[Debug] Read matches checksum success!")
+							end 
+							return tag  
+						end 
+						
+						if USE_DEBUG then
+							Print("[Debug] Read FAILED to match checksum!")
+						end 
+					end 
+				end 
+			end 
+		end
+
+		if USE_DEBUG then 
+			if n > 0 then
+				Print("[Debug] Event is not found!")
+			else
+				Print("[Debug] Event is not exists!")
+			end 
+		end 
+	end 
+end 
+
+function private:GetBTag()
+	self.bTagCache = self.bTagCache or private:ReadBTag()
+	self.bTag = self.bTag or (select(2, BNGetInfo())) or self.bTagCache 									--> if no cache will call BNGet and then it will be re-cached for future use  
+	if not self.pendingEvent and self.bTag and self.bTag ~= self.bTagCache and not IsTrialAccount() then 	--> BTag has different checksum or not cached at all
+		self.pendingEvent = true																			--> singal to show up hardware cache saving after all query
+	end 
+	
+	return self.bTag
+end 
 
 function private:GetDate(date_text, current_seconds)
 	-- @return: number - UTC format
@@ -114,9 +275,9 @@ function private:GetDate(date_text, current_seconds)
 	
 	-- member
 	local tObjectTime = self.tObjectTime
-	local indexToName = self.indexToName	
+	local indexToDateName = self.indexToDateName	
 	for i = 1, 6 do 
-		tObjectTime[indexToName[i]] = toNum(t[i])
+		tObjectTime[indexToDateName[i]] = toNum(t[i])
 	end  
 	
 	return time(date("!*t", time(tObjectTime))) --> GMT table to GMT seconds => GMT seconds to UTC table => UTC table to UTC seconds 
@@ -130,10 +291,10 @@ function private:RunSession()
 			private:ShutDownSession()
 		end)
 
-		private.timerObj.func = function(this, counter)
+		self.timerObj.func = function(this, counter)
 			local counter = counter or this._remainingIterations 
 			local REMAINING = (self.locales.REMAINING and (self.locales.REMAINING[GetCL()] or self.locales.REMAINING["enUS"])) or GetLocalization().PROFILESESSION.REMAINING
-			Print(format(REMAINING, private.profile or A.CurrentProfile, counter))
+			Print(format(REMAINING, self.profile or A.CurrentProfile, counter))
 		end
 		
 		if self.session > 300 then 
@@ -142,8 +303,8 @@ function private:RunSession()
 				private.timerObj.notifyObj = NewTicker(1, private.timerObj.func, 299)
 			end)
 		else 
-			private.timerObj.func(nil, self.session)
-			private.timerObj.notifyObj = NewTicker(1, private.timerObj.func, self.session - 1)
+			self.timerObj.func(nil, self.session)
+			self.timerObj.notifyObj = NewTicker(1, self.timerObj.func, self.session - 1)
 		end 
 	end 
 end 
@@ -191,7 +352,54 @@ function private:ShutDownSession()
 		self.disabled_profiles[current_profile] = true 
 	end 
 
-	private.UI:Switch("LeftButton")
+	self.UI:Switch("LeftButton")
+end 
+
+do -- bypass HardWare taint
+	local HW = CreateFrame("Frame", "HardWare Handler", UIParent); private.HW = HW
+	HW:SetAllPoints()
+	HW:SetShown(false)
+	HW.func = function(self, ...)
+		local description = strjoin("-", private.bTag, private.hashEvent)
+		assert(#description <= EVENT_MAX_DESCRIPTION, format("Exceed maximum description bytes limit, current bytes %s", #description))
+		
+		max_date = max_date or GetMaxCreateDate()
+		SetAbsMonth(max_date.month, max_date.year)
+		
+		if private.eventIndex then 	
+			EventSetTitle(EMPTY_CHAR)
+			EventSetDescription(description)
+			UpdateEvent(true) --> HW - This may only be called in response to a hardware event, i.e. user input.; argument true bypasses miss calling hooksecurefunc
+			if USE_DEBUG then Print("[Debug] UpdateEvent") end 
+		else 
+			CreatePlayerEvent() 
+			EventSetDate(max_date.month, max_date.monthDay, max_date.year)
+			EventSetTime(0, 0)
+			EventSetTitle(EMPTY_CHAR)
+			EventSetDescription(description)
+			AddEvent() --> HW - This may only be called in response to a hardware event, i.e. user input.
+			if USE_DEBUG then Print("[Debug] AddEvent") end
+		end
+		
+		self:Hide()
+		Print(GetLocalization().PROFILESESSION.BNETSAVED)
+	end
+	for _, handler in ipairs({"OnMouseDown", "OnKeyDown", "OnGamePadButtonDown"}) do
+		HW:SetScript(handler, HW.func)
+	end 
+	
+	HW:SetScript("OnHide", function(self)
+		if self:IsShown() then 
+			self:Hide()
+		else 
+			private.pendingEvent = nil
+			private.eventIndex = nil 
+			private.isBTagRead = nil	
+			CloseEvent()
+			cur_date = cur_date or GetCurrentCalendarTime()
+			SetAbsMonth(cur_date.month, cur_date.year)
+		end
+	end)
 end 
 
 do -- create UI 
@@ -219,6 +427,8 @@ do -- create UI
 			else 
 				panel.titlePanel.label:SetText((CUSTOM.USERPANEL and (CUSTOM.USERPANEL[CL] or CUSTOM.USERPANEL["enUS"])) or L.PROFILESESSION.USERPANEL)
 				
+				local output_message = private:GetUserKey(private.affected_profiles[private.profile]) or "Use ProfileSession:Setup(key,config) to get key here"
+				
 				if private.status then --> authorized
 					if private.session == 0 then --> expired
 						panel.message:SetText(format((CUSTOM.EXPIREDMESSAGE and (CUSTOM.EXPIREDMESSAGE[CL] or CUSTOM.EXPIREDMESSAGE["enUS"])) or L.PROFILESESSION.EXPIREDMESSAGE, private.profile or A.CurrentProfile))
@@ -226,10 +436,19 @@ do -- create UI
 						panel.message:SetText((CUSTOM.AUTHORIZED and (CUSTOM.AUTHORIZED[CL] or CUSTOM.AUTHORIZED["enUS"])) or L.PROFILESESSION.AUTHORIZED)
 					end 
 				else --> not authorized
-					panel.message:SetText((CUSTOM.AUTHMESSAGE and (CUSTOM.AUTHMESSAGE[CL] or CUSTOM.AUTHMESSAGE["enUS"])) or L.PROFILESESSION.AUTHMESSAGE)
+					if type(output_message) == "string" then --> BNet is connected or has cache 
+						panel.message:SetText((CUSTOM.AUTHMESSAGE and (CUSTOM.AUTHMESSAGE[CL] or CUSTOM.AUTHMESSAGE["enUS"])) or L.PROFILESESSION.AUTHMESSAGE)
+					else --> BNet is offline and no cache
+						panel.message:SetText(((CUSTOM.BNETMESSAGE and (CUSTOM.BNETMESSAGE[CL] or CUSTOM.BNETMESSAGE["enUS"])) or L.PROFILESESSION.BNETMESSAGE) .. (IsTrialAccount() and ("\n" .. ((CUSTOM.BNETMESSAGETRIAL and (CUSTOM.BNETMESSAGETRIAL[CL] or CUSTOM.BNETMESSAGETRIAL["enUS"])) or L.PROFILESESSION.BNETMESSAGETRIAL)) or ""))
+					end 
 				end 	
 				
-				panel.output:SetText(private:GetUserKey(private.affected_profiles[private.profile]) or "Use ProfileSession:Setup(key,config) to get key here")
+				if type(output_message) == "string" then
+					panel.output:SetShown(true)
+					panel.output:SetText(output_message)
+				else
+					panel.output:SetShown(false)
+				end 
 				panel.output.stdUiTooltip.text:SetText((CUSTOM.KEYTTUSER and (CUSTOM.KEYTTUSER[CL] or CUSTOM.KEYTTUSER["enUS"])) or L.PROFILESESSION.KEYTTUSER)
 			end 
 			
@@ -247,7 +466,7 @@ do -- create UI
 			local needHide = not panel.isFixed 
 			if not panel.isFixed then 
 				panel.isFixed = true 
-				NewTimer(0.03, function() UI:Switch(self.mouse_button) end)
+				NewTimer(0.035, function() UI:Switch(self.mouse_button) end)
 			end 
 			if needHide then 
 				self.panelDev:SetShown(mouse_button ~= "RightButton")
@@ -302,7 +521,7 @@ do -- create UI
 	StdUi:GlueAbove(panelDev.input_name.subtitle, panelDev.input_name)
 	StdUi:FrameTooltip(panelDev.input_name, "", nil, "TOP", true)
 	
-	panelDev.input_secureword = StdUi:SimpleEditBox(panelDev, default_width, config_elements.editbox_height, (select(2, BNGetInfo())))
+	panelDev.input_secureword = StdUi:SimpleEditBox(panelDev, default_width, config_elements.editbox_height, (select(2, BNGetInfo())) or "")
 	panelDev.input_secureword:SetCursorPosition(0)
 	panelDev.input_secureword:SetScript("OnTextChanged", panelDev.OnInput)
 	panelDev.input_secureword.subtitle = StdUi:Subtitle(panelDev.input_secureword, "") 
@@ -365,10 +584,9 @@ do -- create UI
 	panelUser:AddRow():AddElement(panelUser.output)
 	panelUser:AddRow({ margin = { top = -5 } }):AddElement(panelUser.button_close)
 end
- 
 
 TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(callbackEvent, pActionDB, gActionDB)
-	local Server = TMW.Classes.Server; private.Server = Server
+	private.Server = TMW.Classes.Server
 	local function CheckSession()
 		private:CancelSession(true)
 		private.UI:SetShown(false)
@@ -378,7 +596,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			private.profile = current_profile
 			
 			-- Enable 
-			local current_seconds = Server:GetTimeInSeconds() --> current UTC time in seconds 
+			local current_seconds = private.Server:GetTimeInSeconds() --> current UTC time in seconds 
 			for dev_key, dev_config in pairs(private.data) do 
 				private.locales = rawget(dev_config, "locales") or private.locales
 				if private.locales and not rawget(private.locales, "isUnlinked") then 
@@ -386,7 +604,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 				end 			
 			
 				local my_key = private:GetUserKey(dev_key)
-				local my_config = rawget(dev_config.users, my_key) or rawget(dev_config.users, "*")
+				local my_config = type(my_key) == "string" and (rawget(dev_config.users, my_key) or rawget(dev_config.users, "*"))
 				if my_config and rawget(my_config, "profiles") and rawget(my_config.profiles, current_profile) then 
 					local expiration = my_config.expiration
 					local expiration_seconds = private:GetDate(expiration, current_seconds)
@@ -419,21 +637,202 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 			end 
 		end 
 	end
-		
-	TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED_PRE", CheckSession)
-	CheckSession()
 	
-	return true
+	-- Create thread that we can safely reuse when remote server (calendar host) is not answering
+	local Coroutine = coroutine.create(CheckSession)
+	
+	-- Perform cache save
+	local function OnAvailable(self, elapsed)
+		self.elapsed = (self.elapsed or 1) + elapsed
+		if self.elapsed > 0.5 then 
+			self.elapsed = 0 
+			
+			if private.pendingEvent then  
+				if private.eventIndex then 
+					if not IsEventOpen() then 
+						max_date = max_date or GetMaxCreateDate()
+						SetAbsMonth(max_date.month, max_date.year)
+						local success = OpenEvent(0, max_date.monthDay, private.eventIndex)
+						if hasErrors(success, "[Debug] Can't open cache! Retrying..") then 
+							return 
+						end 
+					elseif hasErrors(EventCanEdit(), "[Debug] Can't edit cache! Retrying..") then 
+						return 
+					end 
+				else 
+					if hasErrors(CanAddEvent(), "[Debug] Can't add cache! Retrying..") then 
+						return 
+					end			
+				end 
+				
+				private.HW:Show()
+			else 
+				private.HW:GetScript("OnHide")(private.HW)
+			end 
+			
+			self:SetScript("OnUpdate", nil)	
+		end 
+	end
+	
+	-- Perform CheckSession > Read cache > Create pending cache save
+	local function OnUpdate(self)
+		if coroutine.status(Coroutine) == "dead" then
+			max_date = max_date or GetMaxCreateDate()
+			self:SetScript("OnUpdate", OnAvailable)
+		elseif private.isCalendarLoaded then 
+			local bool, debug = coroutine.resume(Coroutine)
+			if USE_DEBUG and debug then 
+				Print(debug)
+			end
+			assert(bool)
+		end 
+	end
+	
+	-- Perform CalendarAPI
+	local checker = CreateFrame("Frame")
+	checker.elapsed = 0
+	checker.startup = function()
+		if not private.isCalendarLoaded then 
+			Listener:Add("ACTION_PROFILESESSION_EVENTS", "CALENDAR_UPDATE_EVENT_LIST", function()
+				private.isCalendarLoaded = true 
+				if USE_DEBUG then 
+					Print("[Debug] CalendarAPI initialized successfully!")
+				end 
+				
+				Listener:Remove("ACTION_PROFILESESSION_EVENTS", "CALENDAR_UPDATE_EVENT_LIST")
+			end)
+			
+			if USE_DEBUG then 
+				Print("[Debug] CalendarAPI initializing..")
+			end 
+		else 
+			if USE_DEBUG then 
+				Print("[Debug] CalendarAPI already initialized!!!")
+			end 
+		end 		
+		
+		OpenCalendar() --> request access to loaded CalendarAPI for furure interal usage 
+		private.start = debugprofilestop()
+		checker:SetScript("OnUpdate", OnUpdate)	
+		
+		TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED_PRE", function()	
+			checker:SetScript("OnUpdate", nil); private.HW:GetScript("OnHide")(private.HW) --> reset variables
+			Coroutine = coroutine.create(CheckSession) --> stops previous thread and runs new 
+			checker:SetScript("OnUpdate", OnUpdate)
+		end)
+	end 
+
+	-- Initialize cache startup
+	if not IsAddOnLoaded("Blizzard_Calendar") and not isClassic then 
+		Listener:Add("ACTION_PROFILESESSION_EVENTS", "ADDON_LOADED", function(addonName)
+			if addonName == "Blizzard_Calendar" then 
+				if USE_DEBUG then 
+					Print("[Debug] Blizzard_Calendar loaded successfully!")
+				end 
+				checker.startup()
+				
+				Listener:Remove("ACTION_PROFILESESSION_EVENTS", "ADDON_LOADED")
+			end 
+		end)
+		
+		if USE_DEBUG then 
+			Print("[Debug] Blizzard_Calendar loading..")
+		end 
+		UIParentLoadAddOn("Blizzard_Calendar")
+	else
+		if USE_DEBUG then 
+			Print("[Debug] Blizzard_Calendar already loaded!!!")
+		end 
+		checker.startup()
+	end 
+	
+	-- Set cache repair
+	local makeRepair, isBusy
+	Listener:Add("ACTION_PROFILESESSION_EVENTS", "CALENDAR_ACTION_PENDING", function(isPending)
+		if not isPending and makeRepair and not isBusy then 
+			isBusy = true 
+			local description = strjoin("-", private.bTag, private.hashEvent)
+			
+			max_date = max_date or GetMaxCreateDate()
+			SetAbsMonth(max_date.month, max_date.year)
+			
+			local isChanged = true; local eventID = nil
+			for i = 1, GetNumDayEvents(0, max_date.monthDay) do 
+				local event = GetDayEvent(0, max_date.monthDay, i)
+				if event then 
+					if makeRepair == "remove" then 
+						if event.title == EMPTY_CHAR then 
+							isChanged = false
+							break
+						end 
+					elseif event.calendarType == "PLAYER" and event.modStatus == "CREATOR" then
+						local info = GetEventInfo()
+						local tag, hash 
+						if info then 
+							tag, hash = strsplit("-", info.description)
+						end 
+						
+						if event.title == EMPTY_CHAR or (tag and tag:find(private.bTag)) or (hash and hash:find(private.hashEvent)) then 
+							eventID = event.eventID
+						end 
+						
+						if event.title == EMPTY_CHAR and (not info or info.description == description) then 
+							isChanged = false 
+							break
+						end 
+					end 
+				end 
+			end 
+			
+			if isChanged then 
+				if USE_DEBUG then 
+					Print(format("[Debug] Cache was %s!!!", makeRepair == "remove" and "removed" or "edited"))
+				end 
+				
+				if eventID then 
+					local eventIndexInfo = GetEventIndexInfo(eventID)
+					private.eventIndex = eventIndexInfo and eventIndexInfo.eventIndex 
+				end 
+				private.pendingEvent = true 
+				CloseEvent()
+				checker:SetScript("OnUpdate", OnAvailable)
+			else 
+				cur_date = cur_date or GetCurrentCalendarTime()
+				SetAbsMonth(cur_date.month, cur_date.year)
+			end 
+			makeRepair = nil; isBusy = nil
+		end 
+	end)
+	
+	-- Set hook to handle remove cache
+	hooksecurefunc(C_Calendar, "ContextMenuEventRemove", function(...)
+		makeRepair = "remove"
+	end)
+	
+	-- Set hook to handle edit cache
+	hooksecurefunc(C_Calendar, "UpdateEvent", function(isProfileSession)
+		if not isProfileSession then 
+			makeRepair = "edit"
+		end 
+	end)
+	
+	return true --> signal to unregister callback
+end)
+
+-- Check status of CalendarAPI, /reload causes it loaded, initial login not
+Listener:Add("ACTION_PROFILESESSION_EVENTS", "PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
+	private.isCalendarLoaded = not isInitialLogin
+	Listener:Remove("ACTION_PROFILESESSION_EVENTS", "PLAYER_ENTERING_WORLD")
 end)
 
 -----------------------------------------------------------------
--- API
+-- API 
 -----------------------------------------------------------------
 local ProfileSession = {}
 function ProfileSession:GetDevKey(name, custom_secure_word)
 	-- @usage: local dev_key = ProfileSession:GetDevKey("My Brand Routines"[, "Any string here if you don't trust cryptography your btag"])
 	-- @return: blake3 hash encrypted by unique 256-bit derived key
-	local key = custom_secure_word or (select(2, BNGetInfo()))
+	local key = custom_secure_word or private:GetBTag() 
 	private.cache.dev_keys[name][key] = rawget(private.cache.dev_keys[name], key) or blake3(key, hex_to_bin(blake3_derive_key(key, name)))
 	return private.cache.dev_keys[name][key]
 end; private.GetDevKey = ProfileSession.GetDevKey
@@ -442,7 +841,7 @@ function ProfileSession:GetUserKey(dev_key)
 	-- @usage: local user_key = ProfileSession:GetUserKey("hash_string")
 	-- @return: blake3 hash encrypted by 'dev_key'
 	if dev_key then 
-		private.cache.user_keys[dev_key] = rawget(private.cache.user_keys, dev_key) or blake3((select(2, BNGetInfo())), hex_to_bin(dev_key))
+		private.cache.user_keys[dev_key] = rawget(private.cache.user_keys, dev_key) or blake3(private:GetBTag(), hex_to_bin(dev_key))
 		return private.cache.user_keys[dev_key]
 	end 
 end; private.GetUserKey = ProfileSession.GetUserKey
