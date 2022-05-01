@@ -148,6 +148,7 @@ local metatable; metatable = {
 local private = {
 	cache 		= setmetatable({}, metatable),
 	data 		= setmetatable({}, metatable),
+	tEmpty		= {},
 	tObjectTime = {},
 	indexToDateName = {
 		[1] = "year",
@@ -410,9 +411,13 @@ do -- create UI
 		if mouse_button then 
 			self.mouse_button = mouse_button
 			
+			if not private.affected_profiles[A.CurrentProfile] and mouse_button == "LeftButton" then --> shows only on valid profiles 
+				return 
+			end 			
+			
 			local L = GetLocalization()
 			local CL = GetCL()
-			local CUSTOM = private.locales 
+			local CUSTOM = private.locales or private.tEmpty
 			
 			local panel = mouse_button == "LeftButton" and self.panelUser or self.panelDev
 			if mouse_button == "RightButton" then 
@@ -458,9 +463,7 @@ do -- create UI
 			panel:SetHeight(math_abs(select(5, panel.button_close:GetPoint())) + panel.button_close:GetHeight() + 10)
 			
 			self.panelDev:SetShown(mouse_button == "RightButton")
-			if private.affected_profiles[A.CurrentProfile] then --> shows only on valid profiles 
-				self.panelUser:SetShown(mouse_button == "LeftButton")
-			end 			
+			self.panelUser:SetShown(mouse_button == "LeftButton")			
 			
 			-- This is so terrible StdUi bug with editboxes on layout, so terrible..
 			local needHide = not panel.isFixed 
@@ -1038,14 +1041,17 @@ local dev_key = "cdb0db7b6f82440a270838ce2951853facbc017a9eb1c8b6b7c4f8ebc42d8e2
 -- Make sure that you performed initial setup with your dev_key as user_key, it needs to retrive your user_key, after that you will replace dev_key by user_key. It must to be done one time per each dev_key.
 local ProfileSession = _G.Action.ProfileSession
 ProfileSession:Setup(dev_key or "cdb0db7b6f82440a270838ce2951853facbc017a9eb1c8b6b7c4f8ebc42d8e23", {
-	["cdb0db7b6f82440a270838ce2951853facbc017a9eb1c8b6b7c4f8ebc42d8e23"] = { 		--> put your dev_key here, just to get your user_key otherwise it will not allow you to enter in native UI 
-		expiration = "2100-01-01-23-59-59",
-		profiles = {
-			["profileName1-Warrior"] = true,
+	-- required
+	users = {
+		["cdb0db7b6f82440a270838ce2951853facbc017a9eb1c8b6b7c4f8ebc42d8e23"] = { 		--> put your dev_key here, just to get your user_key otherwise it will not allow you to enter in native UI 
+			expiration = "2100-01-01-23-59-59",
+			profiles = {
+				["profileName1-Warrior"] = true,
+			},
 		},
+		-- You will replace this key as soon as you will get own user_key.
+		-- See description @usage in the function ProfileSession:Setup(dev_key, dev_config) in this file 
 	},
-	-- You will replace this key as soon as you will get own user_key.
-	-- See description @usage in the function ProfileSession:Setup(dev_key, dev_config) in this file 
 })
 
 -- 3th step (optional): Obfuscate your written code (2th step) by using: MoonSec, Luraph, AzureBrew, Prometheus, SimplyXOR, or any such tool.
