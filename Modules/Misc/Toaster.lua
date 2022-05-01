@@ -4,6 +4,7 @@
 local ADDON_NAME, private														= ...
 local _G, unpack, type, math, pairs, error, next, setmetatable, select, rawset	= _G, unpack, type, math, pairs, error, next, setmetatable, select, rawset
 local tremove																	= table.remove
+local format 																	= string.format
 local math_floor																= math.floor
 local math_huge																	= math.huge
 local math_max																	= math.max
@@ -14,7 +15,7 @@ local UIParent																	= _G.UIParent
 local Toaster																	= _G.Toaster -- The Action _G.Toaster will be initilized first, then _G.Toaster will be replaced by original if Toaster addon will be loaded, but we will keep our local
 local LibStub																	= _G.LibStub
 local AceDB 																	= LibStub("AceDB-3.0", true)
-local AceConfigRegistry 														= LibStub("AceConfigRegistry-3.0", true)	
+local AceConfigRegistry 														= LibStub("AceConfigRegistry-3.0", true)
 local AceConfigDialog 															= LibStub("AceConfigDialog-3.0", true)	
 local AceLocale																	= LibStub("AceLocale-3.0", true)
 local LibWindow 																= LibStub("LibWindow-1.1", true)
@@ -55,7 +56,7 @@ local expirationToasts = setmetatable({}, {
 	end, 
 })
 
-if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and LibWindow and LDBIcon and LibToast then
+if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and LibWindow and LDBIcon and LibToast then 
 	Toaster.expirationToasts = expirationToasts
 	local TOASTER_NAME = "The Action Toaster"
 	
@@ -240,7 +241,7 @@ if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and
 	
 	local wrongName			= ADDON_NAME .. "Settings"
 	local AceDBNew_Original = AceDB.New 
-	function AceDB:New(...)		
+	function AceDB:New(...)	
 		local dbName = ...
 		if dbName == wrongName then 
 			local vararg = { ... }
@@ -550,7 +551,7 @@ if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and
 		end 
 	end 
 	
-	hooksecurefunc(AceConfigRegistry, "RegisterOptionsTable", function(...)		
+	hooksecurefunc(AceConfigRegistry, "RegisterOptionsTable", function(...)
 		local _, argName, argOptions = ...
 		
 		-- The Action Toaster
@@ -590,7 +591,7 @@ if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and
 			
 			-- Update size, scale and parent from db settings
 			LibWindow.RestorePosition(anchorFrame)
-			hookOnDragStart(anchorFrame)
+			hookOnDragStart(anchorFrame)	
 		end 
 		
 		-- The Action Toaster:Color 
@@ -676,7 +677,7 @@ if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and
 	end)
 	
 	-- OnInitialize
-	hooksecurefunc(Toaster, "OnInitialize", function(self)
+	local function OnInitialize(self)
 		if self.name ~= ADDON_NAME then 
 			error("The Action Toaster - Failed in hook on 'Toaster:OnInitialize'. Object doesn't match addon's own object") 
 			return
@@ -745,9 +746,35 @@ if Toaster and AceDB and AceConfigRegistry and AceConfigDialog and AceLocale and
 				Toaster.ColorOptions = _G.Toaster.ColorOptions				
 				Listener:Remove("ACTION_EVENT_TOASTER", "ADDON_LOADED")				
 			end 
-		end)
-	end)
+		end)	
+	end 
 	
+	if not _G[wrongName] then 
+		-- If addon was not initilized
+		hooksecurefunc(Toaster, "OnInitialize", OnInitialize)
+	else 
+		-- If addon was already initilized
+		if _G["ToasterSettings"] then  
+			AceDB:New("ToasterSettings", private.DATABASE_DEFAULTS, "Default")
+		end 
+		
+		AceDB:New(wrongName, private.DATABASE_DEFAULTS, "Default")
+		
+		-- It will be fired for both instances _G.Toaster and Toaster 
+		local AceConfigDialog_AddToBlizOptions = AceConfigDialog.AddToBlizOptions
+		AceConfigDialog.AddToBlizOptions = function(self, name) 
+			if name == ADDON_NAME then 
+				return Toaster.OptionsFrame 
+			elseif name == ADDON_NAME_COLOR then 
+				return Toaster.ColorOptions
+			end 
+		end 
+		Toaster:SetupOptions()
+		AceConfigDialog.AddToBlizOptions = AceConfigDialog_AddToBlizOptions
+		
+		OnInitialize(Toaster)
+	end 
+
 	-- Registers default toast
 	LibToast:Register("ActionDefault", function(toast, ...)		
 		local msg, urgency, obj = ...
