@@ -14373,7 +14373,7 @@ function Action.ToggleMainUI()
 				-- Druid in Classic hasn't ressurect
 				SelectResurrects:Disable()
 				SelectResurrects:SetChecked(false, true) -- only internal 
-				db.SelectResurrects = false 
+				specDB[db].SelectResurrects = false 
 			end 
 		end -- isHealer END 
 
