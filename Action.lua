@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "03.09.2022"
+local DateTime 														= "12.09.2022"
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -8196,6 +8196,7 @@ function Action.IsQueueReady(meta)
 					and (not self.PowerCustom or UnitPower("player", self.PowerType) >= (self.PowerCost or 0)) 
 					and (self.Auto or self:RunQLua(self.UnitID)) 
 					and (not self.isCP or A_Player:ComboPoints("target") >= (self.CP or 1)) 
+					and (self.Type ~= "Spell" or self:GetSpellCastTime() == 0 or not A_Player:IsMoving())
 		end 
     end 
 	
