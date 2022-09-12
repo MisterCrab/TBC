@@ -580,40 +580,41 @@ end
 --    iName			
 local function TMWAPI(icon, ...)
     local attributesString, param = ...
-    
-	-- Sets texture 
-    if attributesString == "state" then 
-        -- Color if not colored (Alpha will show it)
-        if type(param) == "table" and param["Color"] then 
-            if icon.attributes.calculatedState.Color ~= param["Color"] then 
-                icon:SetInfo(attributesString, {Color = param["Color"], Alpha = param["Alpha"], Texture = param["Texture"]})
-            end
-            return 
-        end 
-        
-        -- Hide if not hidden
-        if type(param) == "number" and (param == 0 or param == CONST.TMW_DEFAULT_STATE_HIDE) then
-            if icon.attributes.realAlpha ~= 0 then 
-                icon:SetInfo(attributesString, param)
-            end 
-            return 
-        end 
-    end 
-    
-    if attributesString == "texture" and type(param) == "number" then         
-        if (icon.attributes.calculatedState.Color ~= "ffffffff" or icon.attributes.realAlpha == 0) then 
-            -- Show + Texture if hidden
-            icon:SetInfo("state; " .. attributesString, CONST.TMW_DEFAULT_STATE_SHOW, param)
-        elseif icon.attributes.texture ~= param then 
-            -- Texture if not applied        
-            icon:SetInfo(attributesString, param)
-        end 
-        return         
-    end 
+	
+	if icon.attributes then 
+		if attributesString == "state" then 
+			-- Color if not colored (Alpha will show it)
+			if type(param) == "table" and param["Color"] then 
+				if icon.attributes.calculatedState.Color ~= param["Color"] then 
+					icon:SetInfo(attributesString, {Color = param["Color"], Alpha = param["Alpha"], Texture = param["Texture"]})
+				end
+				return 
+			end 
+			
+			-- Hide if not hidden
+			if type(param) == "number" and (param == 0 or param == CONST.TMW_DEFAULT_STATE_HIDE) then
+				if icon.attributes.realAlpha ~= 0 then 
+					icon:SetInfo(attributesString, param)
+				end 
+				return 
+			end 
+		end 
+		
+		if attributesString == "texture" and type(param) == "number" then         
+			if (icon.attributes.calculatedState.Color ~= "ffffffff" or icon.attributes.realAlpha == 0) then 
+				-- Show + Texture if hidden
+				icon:SetInfo("state; " .. attributesString, CONST.TMW_DEFAULT_STATE_SHOW, param)
+			elseif icon.attributes.texture ~= param then 
+				-- Texture if not applied        
+				icon:SetInfo(attributesString, param)
+			end 
+			return         
+		end 
+	end 
     
     icon:SetInfo(...)
 end
-  
+ 
 function A.Hide(icon)
 	-- @usage A.Hide(icon)
 	if not icon then 
