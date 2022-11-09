@@ -31,7 +31,7 @@ local A 								= _G.Action
 local CONST 							= A.Const
 local Listener							= A.Listener
 local Print								= A.Print
-local Lib 								= LibStub:NewLibrary("MacroLibrary", 3)
+local Lib 								= LibStub:NewLibrary("MacroLibrary", 4)
 	  
 local wipe 								= _G.wipe	  
 local MAX_ACCOUNT_MACROS				= _G.MAX_ACCOUNT_MACROS
@@ -533,9 +533,9 @@ Listener:Add("ACTION_EVENT_MACRO_LIBRARY", "ADDON_LOADED", function(addonName)
 		GetMacroItemIcons(Lib.Data.ItemIcons)
 		
 		MacroFrame_LoadUI()
-		MacroFrame_Update				= _G.MacroFrame_Update
-		MacroFrame_SelectMacro			= _G.MacroFrame_SelectMacro
-		MacroFrame_Show					= _G.MacroFrame_Show
+		MacroFrame_Update				= _G.MacroFrame_Update 		or function() 	Lib.MacroFrame:Update() 		end 
+		MacroFrame_SelectMacro			= _G.MacroFrame_SelectMacro or function(ID) Lib.MacroFrame:SelectMacro(ID) 	end 
+		MacroFrame_Show					= _G.MacroFrame_Show 		or function() 	Lib.MacroFrame:Show() 			end
 		Lib.MacroFrame 					= _G.MacroFrame
 		Lib.MacroFrameTab1				= _G.MacroFrameTab1
 		Lib.MacroFrameTab2				= _G.MacroFrameTab2
