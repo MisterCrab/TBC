@@ -25,6 +25,13 @@ local function sortByHighest(x, y)
 	return x > y
 end
 
+local getUnitTarget = setmetatable({}, { 
+	__index = function(t, k)
+		t[k] = k .. "target"
+		return t[k]
+	end,
+})
+
 -------------------------------------------------------------------------------
 -- Remap
 -------------------------------------------------------------------------------
@@ -71,16 +78,16 @@ local MultiUnitsOnEventWipeCLEU						= MultiUnits.onEventWipeCLEU
 -- Nameplates
 MultiUnits.AddNameplate								= function(unitID)
 	if UnitCanAttack(player, unitID) then 
-		MultiUnitsActiveUnitPlates[unitID] 			= unitID
-		MultiUnitsActiveUnitPlatesAny[unitID] 		= unitID
+		MultiUnitsActiveUnitPlates[unitID] 			= getUnitTarget[unitID]
+		MultiUnitsActiveUnitPlatesAny[unitID] 		= getUnitTarget[unitID]
 		if A.Zone ~= "pvp" then 
 			local GUID 								= UnitGUID(unitID)
 			if GUID then 
-				MultiUnitsActiveUnitPlatesGUID[GUID] = unitID
+				MultiUnitsActiveUnitPlatesGUID[GUID] = getUnitTarget[unitID]
 			end
 		end 
 	else 
-		MultiUnitsActiveUnitPlatesAny[unitID] = unitID
+		MultiUnitsActiveUnitPlatesAny[unitID] = getUnitTarget[unitID]
 	end
 end
 
