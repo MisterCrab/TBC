@@ -18,6 +18,8 @@ local toNum 				= A.toNum
 local Print 				= A.Print
 local ActionDataColor		= A.Data.C
 
+local isClassic				= A.StdUi.isClassic
+
 -------------------------------------------------------------------------------
 -- Remap
 -------------------------------------------------------------------------------
@@ -491,6 +493,14 @@ local function UpdateCVAR()
 		SetCVar("nameplateMaxDistance", CONST.CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE) 
 		Print("nameplateMaxDistance " .. nameplateMaxDistance .. " => " .. CONST.CACHE_DEFAULT_NAMEPLATE_MAX_DISTANCE)	
 	end	
+	
+	if isClassic and toNum[GetCVar("nameplateNotSelectedAlpha") or 0] >= 0 then 
+		SetCVar("nameplateNotSelectedAlpha", -1)
+	end 
+	
+	if toNum[GetCVar("nameplateOccludedAlphaMult") or 0] > 0.4 then 
+		SetCVar("nameplateOccludedAlphaMult", 0.4)
+	end 
 	
 	if GetToggle(1, "cameraDistanceMaxZoomFactor") then 
 		local cameraDistanceMaxZoomFactor = GetCVar("cameraDistanceMaxZoomFactor")
