@@ -60,8 +60,9 @@ local 	 CancelUnitBuff, 	CancelSpellByName, 	  CombatLogGetCurrentEventInfo =
 	  _G.CancelUnitBuff, _G.CancelSpellByName, _G.CombatLogGetCurrentEventInfo
 	  
 -- Bags / Inventory
-local 	 GetContainerNumSlots, 	  GetContainerItemID, 	 GetInventoryItemID, 	GetItemInfoInstant,    GetItemCount, 	IsEquippableItem =	  
-	  _G.GetContainerNumSlots, _G.GetContainerItemID, _G.GetInventoryItemID, _G.GetItemInfoInstant, _G.GetItemCount, _G.IsEquippableItem
+local 	 C_Container = _G.C_Container
+local 	 GetContainerNumSlots, 	  									  GetContainerItemID, 	 								   GetInventoryItemID, 	  GetItemInfoInstant,    GetItemCount, 	  IsEquippableItem =	  
+	  _G.GetContainerNumSlots or C_Container.GetContainerNumSlots, _G.GetContainerItemID or C_Container.GetContainerItemID, _G.GetInventoryItemID, _G.GetItemInfoInstant, _G.GetItemCount, _G.IsEquippableItem
 	  
 -- Classic GetTotemInfo
 local gameVersion				= toNum[select(2, _G.GetBuildInfo())]
