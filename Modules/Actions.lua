@@ -1,3 +1,6 @@
+local ADDON_NAME 			= ...
+local PathToGreenTGA		= [[Interface\AddOns\]] .. ADDON_NAME .. [[\Media\Green.tga]]
+
 local _G, type, next, pairs, ipairs, select, unpack, table, setmetatable, math, string, error = 	
 	  _G, type, next, pairs, ipairs, select, unpack, table, setmetatable, math, string, error
 	  
@@ -1290,7 +1293,7 @@ end
 
 -- SingleColor
 function A:GetColorTexture()
-    return "state", {Color = A.Data.C[self.Color] or self.Color, Alpha = 1, Texture = "ERROR"}
+    return "state", {Color = A.Data.C[self.Color] or self.Color, Alpha = 1, Texture = PathToGreenTGA}
 end 
 
 -- Item
