@@ -65,6 +65,7 @@ local  CreateFrame,    UIParent					=
 	_G.CreateFrame, _G.UIParent	 
 	
 local GameBuild 								= tonumber((select(2, _G.GetBuildInfo())))		
+local BuildToC									= A.BuildToC
 
 local function GetGUID(unitID)
 	return (unitID and (TeamCacheFriendlyUNITs[unitID] or TeamCacheEnemyUNITs[unitID])) or UnitGUID(unitID)
@@ -290,6 +291,11 @@ local function UnitHasRealHealth(unitID)
 	end 
 	
 	if GameBuildHasRealHealth() then 
+		if BuildToC >= 30000 then 
+			-- WOTLK+ always returns correctly UnitHealth for everything
+			return true 
+		end 
+		
 		if A_Unit(unitID):IsEnemy() then 
 			return not A_Unit(unitID):IsPet() and not A_Unit(unitID):IsPlayer()
 		else 
