@@ -271,7 +271,7 @@ local function sort_HP(x, y)
 end
 
 local function sort_AHP(x, y) 
-	return x.AHP > y.AHP 
+	return x.AHP < y.AHP 
 end
 
 local Data; Data 						= {
