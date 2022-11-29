@@ -42,6 +42,7 @@ local InsanityPowerType 		= PowerType.Insanity
 local ArcaneChargesPowerType 	= PowerType.ArcaneCharges
 local FuryPowerType 			= PowerType.Fury
 local PainPowerType				= PowerType.Pain
+local EssencePowerType 			= PowerType.Essence
 
 local GetSpellInfo				= _G.GetSpellInfo
 local InCombatLockdown			= _G.InCombatLockdown  
@@ -1173,6 +1174,12 @@ function Player:ManaTimeToMax()
 	return self:ManaDeficit() / self:ManaRegen()
 end
 
+-- "mana.time_to_x"
+function Player:ManaTimeToX(Amount)
+	if self:ManaRegen() == 0 then return -1 end
+	return Amount > self:Mana() and (Amount - self:Mana()) / self:ManaRegen() or 0
+end
+
 -- Mana Predicted with current cast
 function Player:ManaP()
 	local FutureMana = self:Mana() - self:CastCost()
@@ -1706,6 +1713,29 @@ function Player:PainDeficitPercentage()
 end
 
 ------------------------------
+--- 19 | Essence Functions ---
+------------------------------
+-- essence.max
+function Player:EssenceMax()
+	return UnitPowerMax(self.UnitID, EssencePowerType)
+end
+
+-- essence
+function Player:Essence()
+	return UnitPower(self.UnitID, EssencePowerType)
+end
+
+-- essence.deficit
+function Player:EssenceDeficit()
+	return self:EssenceMax() - self:Essence()
+end
+
+-- essence.deficit.pct
+function Player:EssenceDeficitPercentage()
+	return (self:EssenceDeficit() / self:EssenceMax()) * 100
+end
+
+------------------------------
 --- Predicted Resource Map ---
 ------------------------------
 Player.PredictedResourceMap = {
@@ -1742,3 +1772,41 @@ Player.PredictedResourceMap = {
 	-- Pain
 	[18] = function() return Player:Pain() end,
 }
+
+Player.TimeToXResourceMap = {
+    -- Mana
+    [0] = function(Value) return Player:ManaTimeToX(Value) end,
+    -- Rage
+    [1] = function() return nil end,
+    -- Focus
+    [2] = function(Value) return Player:FocusTimeToX(Value) end,
+    -- Energy
+    [3] = function(Value) return Player:EnergyTimeToX(Value) end,
+    -- ComboPoints
+    [4] = function() return nil end,
+    -- Runic Power
+    [5] = function() return nil end,
+    -- Runes
+    [6] = function(Value) return Player:RuneTimeToX(Value) end,
+    -- Soul Shards
+    [7] = function() return nil end,
+    -- Astral Power
+    [8] = function() return nil end,
+    -- Holy Power
+    [9] = function() return nil end,
+    -- Maelstrom
+    [11] = function() return nil end,
+    -- Chi
+    [12] = function() return nil end,
+    -- Insanity
+    [13] = function() return nil end,
+    -- Arcane Charges
+    [16] = function() return nil end,
+    -- Fury
+    [17] = function() return nil end,
+    -- Pain
+    [18] = function() return nil end,
+    -- Essence
+    -- TODO: Add EssenceTimeToX()
+    [19] = function() return nil end,
+  }
