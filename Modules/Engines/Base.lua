@@ -76,8 +76,8 @@ local huge 										= math.huge
 local wipe										= _G.wipe 
 local C_Map										= _G.C_Map 
 
-local 	 IsInRaid, 	  IsInGroup, 	IsInInstance, 	 RequestBattlefieldScoreData = 
-	  _G.IsInRaid, _G.IsInGroup, _G.IsInInstance, _G.RequestBattlefieldScoreData
+local 	 IsInRaid, 	  IsInGroup, 	IsInInstance, 	 IsActiveBattlefieldArena,    RequestBattlefieldScoreData = 
+	  _G.IsInRaid, _G.IsInGroup, _G.IsInInstance, _G.IsActiveBattlefieldArena, _G.RequestBattlefieldScoreData
 
 local 	 UnitInBattleground, 	UnitExists,    UnitIsFriend, 	UnitGUID = 
 	  _G.UnitInBattleground, _G.UnitExists, _G.UnitIsFriend, _G.UnitGUID
@@ -111,10 +111,16 @@ end
  
 function A:CheckInPvP()
 	-- @return boolean
-    return 
+    if  
+		self.Zone == "arena" or 
 		self.Zone == "pvp" or 
 		UnitInBattleground(player) or 
+		IsActiveBattlefieldArena() or 
 		( A_Unit(target):IsPlayer() and (A_Unit(target):IsEnemy() or (A_Unit(targettarget):IsPlayer() and A_Unit(targettarget):IsEnemy())) )
+	then 
+		return true 
+	end 
+	return false 
 end
 
 local GetEventInfo 						= {
