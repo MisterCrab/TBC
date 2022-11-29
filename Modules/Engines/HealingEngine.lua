@@ -48,6 +48,7 @@ local TeamCacheFriendlyIndexToPLAYERs	= TeamCacheFriendly.IndexToPLAYERs 	-- ind
 local TeamCacheFriendlyIndexToPETs		= TeamCacheFriendly.IndexToPETs 	-- index to unitID
 local GetToggle							= A.GetToggle
 local AuraIsValid						= A.AuraIsValid
+local BuildToC							= A.BuildToC
 local StdUi								= A.StdUi
 local RunLua							= StdUi.RunLua
 local isClassic							= StdUi.isClassic 
@@ -118,7 +119,7 @@ local 	 UnitGUID, 	  UnitIsUnit 		=
 local PredictOptions, SelectStopOptions, dbUnitIDs, db, profileActionDB 
 local inCombat, inGroup, maxGroupSize  
 local player 							= "player"	 
---local focus 							= "focus"
+local focus 							= "focus"
 local target 							= "target"
 local mouseover							= "mouseover"
 local none 								= "none"
@@ -235,7 +236,7 @@ frame.Colors 							= {
 	-- Player 
 	player 								= {0.788235, 0.470588, 0.858824, 1},
 	-- Focus 
-	--focus 								= {0.615686, 0.227451, 0.988235, 1},
+	focus 								= {0.615686, 0.227451, 0.988235, 1},
 	-- Reserved
 	--[[
 	PLACEHOLDER							= {0.411765, 0.760784, 0.176471, 1},
@@ -680,14 +681,14 @@ do
 end 
 
 local member, memberGUID, memberData
---local playerGUID, focusGUID 
+local playerGUID, focusGUID 
 local function OnUpdate()   
     -- Wipe previous 
 	UnitIDs:Wipe() 
 	SortedUnitIDs:Wipe()
 	SortedUnitIDs_MostlyIncDMG:Wipe()
 	QueueOrder:Wipe()
-	--playerGUID, focusGUID 				= nil, nil 
+	playerGUID, focusGUID 				= nil, nil 
 	
 	-- Player (solo/party)
     if inGroup ~= "raid" then 
@@ -706,7 +707,7 @@ local function OnUpdate()
 		end 
     end 
 	
-	--[[ Focus 
+	-- Focus 
 	if not isClassic and not A_Unit(focus):IsEnemy() then 
 		-- Replaces party/raid unit by self 
 		member 							= focus
@@ -722,7 +723,7 @@ local function OnUpdate()
 				SortedUnitIDs_MostlyIncDMG[#SortedUnitIDs_MostlyIncDMG + 1] = memberData
 			end 
 		end 
-	end]] 
+	end
             
 	-- Group 
 	if inGroup then 
@@ -730,7 +731,7 @@ local function OnUpdate()
 			-- Players 
 			member 						= TeamCacheFriendlyIndexToPLAYERs[i]   
 			memberGUID 					= member and TeamCacheFriendlyUNITs[member]					
-			if memberGUID then -- and memberGUID ~= focusGUID then				
+			if memberGUID and memberGUID ~= focusGUID then				
 				memberData 				= UnitIDs[member]
 				memberData:Setup(member, memberGUID, true)					
 				FrequencyTemp.MHP 		= (FrequencyTemp.MHP or 0) + memberData.MHP 
@@ -744,7 +745,7 @@ local function OnUpdate()
 			-- Pets
 			member 						= TeamCacheFriendlyIndexToPETs[i]
 			memberGUID 					= member and TeamCacheFriendlyUNITs[member]
-			if memberGUID then -- and memberGUID ~= focusGUID then 
+			if memberGUID and memberGUID ~= focusGUID then 
 				memberData 				= UnitIDs[member]
 				memberData:Setup(member, memberGUID, false)					
 				FrequencyTemp.MHP 		= (FrequencyTemp.MHP or 0) + memberData.MHP 
@@ -827,8 +828,11 @@ local function SetHealingTarget()
 end
 
 local function SetColorTarget()
-	-- If we have no one to heal or we have already selected unit what need to heal
-	if healingTarget == none or healingTargetGUID == none or healingTargetGUID == UnitGUID(target) then			
+	-- If we have no one to heal or we have already selected unit that need to heal
+	if 	healingTarget == none or healingTargetGUID == none or healingTargetGUID == UnitGUID(target) or 
+		-- TBC+ if user playing through /focus binds
+		(BuildToC >= 20000 and healingTargetGUID == UnitGUID(focus) and (not A_Unit(target):IsExists() or A_Unit(target):IsEnemy())) 		
+	then			
 		return frame:SetColor(none)
 	end	
 	
@@ -1413,18 +1417,18 @@ function HealingEngine.GetOptionsByUnitID(unitID, unitGUID)
 	-- Note: Don't change key-values in returned [5] table, only for referrence usage!
 	local GUID = unitGUID or UnitGUID(unitID)
 	if GUID then 
-		--if GUID == focusGUID then 
-		--	local dbUnit = dbUnitIDs.focus
-		--	if dbUnit then 
-		--		return dbUnit.useDispel, dbUnit.useShields, dbUnit.useHoTs, dbUnit.useUtils, dbUnit
-		--	end 
-		--else 
+		if GUID == focusGUID then 
+			local dbUnit = dbUnitIDs.focus
+			if dbUnit then 
+				return dbUnit.useDispel, dbUnit.useShields, dbUnit.useHoTs, dbUnit.useUtils, dbUnit
+			end 
+		else 
 			local unit = TeamCacheFriendlyGUIDs[GUID]
 			local dbUnit = unit and dbUnitIDs[unit]
 			if dbUnit then 
 				return dbUnit.useDispel, dbUnit.useShields, dbUnit.useHoTs, dbUnit.useUtils, dbUnit
 			end 
-		--end 
+		end 
 	end 
 	
 	-- Default return for non in group units 
