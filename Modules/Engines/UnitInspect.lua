@@ -12,8 +12,8 @@ local TeamCacheEnemyUNITs						= TeamCacheEnemy.UNITs
 	  
 local wipe										= _G.wipe	  
 	  
-local 	 UnitPlayerControlled, 	  CanInspect, 	 UnitIsUnit, 	UnitGUID =
-	  _G.UnitPlayerControlled, _G.CanInspect, _G.UnitIsUnit, _G.UnitGUID
+local 	 UnitPlayerControlled, 	  CanInspect, 	 CheckInteractDistance,    UnitIsUnit, 	  UnitGUID =
+	  _G.UnitPlayerControlled, _G.CanInspect, _G.CheckInteractDistance, _G.UnitIsUnit, _G.UnitGUID
 
 local 	 InspectUnit, 	 GetInventoryItemID, 	GetItemInfoInstant,    GetLocale =
 	  _G.InspectUnit, _G.GetInventoryItemID, _G.GetItemInfoInstant, _G.GetLocale
@@ -38,7 +38,7 @@ local function GetGUID(unitID)
 end 
 
 local function UnitInspectItem(unitID, invID)
-    if (UnitPlayerControlled(unitID) and CanInspect(unitID) and not UnitIsUnit("player", unitID)) then    
+    if UnitPlayerControlled(unitID) and CheckInteractDistance(unitID, 1) and CanInspect(unitID, false) and not UnitIsUnit("player", unitID) then  
 		local GUID = GetGUID(unitID)
 		if not GUID then 
 			return 
