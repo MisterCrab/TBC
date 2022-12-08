@@ -57,6 +57,170 @@ local 	 UnitGUID, 	  UnitIsUnit =
 local RANKCOLOR 			= A.Data.RANKCOLOR	
 
 -------------------------------------------------------------------------------
+-- DataBase
+-------------------------------------------------------------------------------
+TMW:RegisterDatabaseDefaults{
+	global = {
+		TextLayouts = {
+			["TMW:textlayout:1Rh4g1a9S6Uf"] = {
+				{
+					["Outline"] = "OUTLINE",
+					["Shadow"] = 0.9,
+					["Anchors"] = {
+						{
+							["y"] = 58,
+							["relativeTo"] = "IconModule_CooldownSweepCooldown",
+							["relativePoint"] = "RIGHT",
+							["x"] = 12.2,
+						}, -- [1]
+					},
+					["Name"] = "Morpheus",
+					["Rotate"] = 90,
+					["Size"] = 35,
+				}, -- [1]
+				["GUID"] = "TMW:textlayout:1Rh4g1a9S6Uf",
+				["Name"] = "UserInterface_TextVertical",
+			},
+			["TMW:textlayout:1RkGJEN4L5o_"] = {
+				{
+					["SkinAs"] = "HotKey",
+					["Anchors"] = {
+						{
+							["y"] = -2,
+							["x"] = -2,
+							["point"] = "TOPLEFT",
+							["relativePoint"] = "TOPLEFT",
+						}, -- [1]
+						{
+							["y"] = -2,
+							["x"] = -2,
+							["point"] = "TOPRIGHT",
+							["relativePoint"] = "TOPRIGHT",
+						}, -- [2]
+						["n"] = 2,
+					},
+					["StringName"] = "Привязка/Ярлык",
+					["Height"] = 1,
+				}, -- [1]
+				{
+					["SkinAs"] = "Count",
+					["Anchors"] = {
+						{
+							["y"] = 2,
+							["x"] = 50.7,
+							["point"] = "RIGHT",
+							["relativePoint"] = "RIGHT",
+						}, -- [1]
+					},
+					["StringName"] = "Стаки",
+					["DefaultText"] = "[Stacks:Hide(0)]",
+				}, -- [2]
+				["GUID"] = "TMW:textlayout:1RkGJEN4L5o_",
+				["Name"] = "UserInterface_DefaultText_RightSide",
+				["n"] = 2,
+			},
+			["TMW:textlayout:1RFt2HZe_Cbk"] = {
+				{
+					["Outline"] = "OUTLINE",
+					["Shadow"] = 0.9,
+					["Anchors"] = {
+						{
+							["point"] = "BOTTOM",
+							["relativePoint"] = "BOTTOM",
+						}, -- [1]
+					},
+					["Size"] = 8,
+				}, -- [1]
+				["GUID"] = "TMW:textlayout:1RFt2HZe_Cbk",
+				["Name"] = "UserInterface_Text",
+			},
+			["TMW:textlayout:1S6ieoFev4r0"] = {
+				{
+					["Outline"] = "OUTLINE",
+					["Shadow"] = 0.9,
+					["Anchors"] = {
+						{
+							["y"] = 2,
+							["point"] = "BOTTOM",
+							["relativePoint"] = "BOTTOM",
+						}, -- [1]
+					},
+					["Name"] = "AR ZhongkaiGBK Medium",
+					["Size"] = 6,
+				}, -- [1]
+				["GUID"] = "TMW:textlayout:1S6ieoFev4r0",
+				["Name"] = "UserInterface_SmallerText",
+			},
+			["TMW:textlayout:1TMvg5InaYOw"] = {
+				{
+					["Anchors"] = {
+						{
+							["y"] = -1.5,
+							["x"] = 1.5,
+							["point"] = "TOPLEFT",
+							["relativePoint"] = "TOPLEFT",
+						}, -- [1]
+					},
+					["DefaultText"] = "[ActionBurst]",
+					["Size"] = 6,
+				}, -- [1]
+				{
+					["Anchors"] = {
+						{
+							["y"] = 1,
+							["x"] = 0.5,
+							["point"] = "BOTTOMRIGHT",
+							["relativePoint"] = "BOTTOMRIGHT",
+						}, -- [1]
+					},
+					["Name"] = "Morpheus",
+					["DefaultText"] = "[ActionAoE]",
+					["Size"] = 6,
+				}, -- [2]
+				{
+					["Anchors"] = {
+						{
+							["y"] = 1,
+							["x"] = 1.5,
+							["point"] = "BOTTOMLEFT",
+							["relativePoint"] = "BOTTOMLEFT",
+						}, -- [1]
+					},
+					["Name"] = "Morpheus",
+					["DefaultText"] = "[ActionMode]",
+					["Size"] = 6,
+				}, -- [3]
+				["GUID"] = "TMW:textlayout:1TMvg5InaYOw",
+				["Name"] = "ActionLayout",
+				["n"] = 3,
+			},
+			["TMW:textlayout:1TYfkpegTiCv"] = {
+				{
+					["Outline"] = "OUTLINE",
+					["Justify"] = "RIGHT",
+					["Name"] = "Accidental Presidency",
+					["StringName"] = "Alert bar display",
+					["Size"] = 11,
+				}, -- [1]
+				["GUID"] = "TMW:textlayout:1TYfkpegTiCv",
+				["Name"] = "Taste Layout",
+			},
+			["TMW:textlayout:1UbsdH6epahK"] = {
+				{
+					["Outline"] = "OUTLINE",
+					["Justify"] = "RIGHT",
+					["Name"] = "Accidental Presidency",
+					["StringName"] = "Alert bar display",
+					["Size"] = 11,
+				}, -- [1]
+				["GUID"] = "TMW:textlayout:1UbsdH6epahK",
+				["Name"] = "Taste Layout 2",
+			},
+		},
+	},
+}
+
+-------------------------------------------------------------------------------
 -- Env.LastPlayerCast
 -------------------------------------------------------------------------------
 -- Note: This code is modified for Action Core 
