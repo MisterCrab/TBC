@@ -85,12 +85,12 @@ local Listener							= A.Listener
 local Print								= A.Print
 local GetCL								= A.GetCL
 local MacroLibrary						= LibStub("MacroLibrary")
-local Lib 								= LibStub:NewLibrary("PetLibrary", 17)
+local Lib 								= LibStub:NewLibrary("PetLibrary", 18)
 	  	  
 local huge 								= math.huge	  
 local max 								= math.max
 local wipe 								= _G.wipe	  
-local isClassic							= _G.WOW_PROJECT_ID == _G.WOW_PROJECT_BURNING_CRUSADE_CLASSIC
+local isClassic							= A.StdUi.isClassic
 local owner								= isClassic and "PlayerClass" or "PlayerSpec"
 	  
 local 	 IsActionInRange, 	 GetActionInfo,    PlaceAction,    ClearCursor,    GetCursorInfo, 	 GetPetFoodTypes, 	 GetSpellBookItemInfo, 	  PickupSpellBookItem, 	  PetHasSpellbook =

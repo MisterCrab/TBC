@@ -34,7 +34,7 @@ local InterruptIsValid			= A.InterruptIsValid
 
 local UnitGUID					= _G.UnitGUID
 
-local isClassic					= _G.WOW_PROJECT_ID == _G.WOW_PROJECT_BURNING_CRUSADE_CLASSIC
+local isClassic					= A.StdUi.isClassic
 local owner						= isClassic and "PlayerClass" or "PlayerSpec"
  
 -------------------------------------------------------------------------------
