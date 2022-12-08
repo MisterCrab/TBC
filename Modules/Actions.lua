@@ -28,9 +28,12 @@ local Unit					= A.Unit
 local Player				= A.Player 
 local LoC 					= A.LossOfControl
 local MultiUnits			= A.MultiUnits
-local TriggerGCD			= A.Enum.TriggerGCD
 local GetToggle				= A.GetToggle
 local BurstIsON				= A.BurstIsON
+local Enum 					= A.Enum
+local TriggerGCD			= Enum.TriggerGCD
+local SpellDuration			= Enum.SpellDuration
+local SpellProjectileSpeed	= Enum.SpellProjectileSpeed
 
 local TRINKET1				= CONST.TRINKET1
 local TRINKET2				= CONST.TRINKET2
@@ -444,6 +447,62 @@ function A:GetSpellAutocast()
 	-- Returns autocastable, autostate 
 	return GetSpellAutocast((self:Info()))
 end 
+
+function A:GetSpellBaseDuration()
+	-- @return number
+	local Duration = SpellDuration[self.ID]
+	if not Duration or Duration == 0 then return 0 end
+
+	return Duration[1] / 1000
+end
+
+function A:GetSpellMaxDuration()
+	-- @return number
+	local Duration = SpellDuration[self.ID]
+	if not Duration or Duration == 0 then return 0 end
+
+	return Duration[2] / 1000
+end
+
+function A:GetSpellPandemicThreshold()
+	-- @return number
+	local BaseDuration = self:GetSpellBaseDuration()
+	if not BaseDuration or BaseDuration == 0 then return 0 end
+
+	return BaseDuration * 0.3
+end
+
+function A:GetSpellTravelTime(unitID)
+	-- @return number
+	local Speed = SpellProjectileSpeed[self.ID]
+	if not Speed or Speed == 0 then return 0 end
+
+	local MaxDistance = (unitID and Unit(unitID):GetRange()) or Unit("target"):GetRange()
+	if not MaxDistance or MaxDistance == huge then return 0 end
+
+	return MaxDistance / (Speed or 22)
+end
+
+function A:DoSpellFilterProjectileSpeed(owner)
+	-- @usage
+	-- Retail - Action:DoSpellFilterProjectileSpeed(Action.PlayerSpec) or A:DoSpellFilterProjectileSpeed(A.PlayerSpec)
+	-- Classic - Action:DoSpellFilterProjectileSpeed(Action.PlayerClass) or A:DoSpellFilterProjectileSpeed(A.PlayerClass)
+	-- Must be used after init Action[specID or className] = { ... } and whenever specialization has been changed for Retail version
+	local RegisteredSpells = {}
+
+	-- Fetch registered spells during the init
+	local ProjectileSpeed
+	for _, actionObj in pairs(A[owner]) do
+		if actionObj.Type == "Spell" then 
+			ProjectileSpeed = SpellProjectileSpeed[actionObj.ID]
+			if ProjectileSpeed ~= nil then
+				RegisteredSpells[actionObj.ID] = ProjectileSpeed
+			end 
+		end 
+	end
+
+	SpellProjectileSpeed = RegisteredSpells
+end
 
 function A:IsSpellLastGCD(byID)
 	-- @return boolean

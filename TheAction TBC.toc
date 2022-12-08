@@ -40,6 +40,8 @@ Modules\Components\Const\Constans.lua
 Action.lua
 
 Modules\Components\Enum\TriggerGCD.lua
+Modules\Components\Enum\SpellDuration.lua
+Modules\Components\Enum\SpellProjectileSpeed.lua
 Modules\Components\Tools.lua
 Modules\Components\Utils.lua
 Modules\Components\Cryptography.lua
