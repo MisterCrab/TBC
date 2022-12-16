@@ -765,7 +765,7 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 		if coroutine.status(Coroutine) == "dead" then
 			max_date = max_date or GetMaxCreateDate()
 			self:SetScript("OnUpdate", OnAvailable)
-		elseif private.isCalendarLoaded then 
+		elseif private.isCalendarLoaded or private.isCalendarLoadedByAnotherAddon then 
 			if coroutine.status(Coroutine_ClearCalendar) ~= "dead" and not isCleaned then 
 				local bool, debug = coroutine.resume(Coroutine_ClearCalendar)
 				if USE_DEBUG and debug and not knownDebug[debug] then 
@@ -801,7 +801,8 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 	local checker = CreateFrame("Frame")
 	checker.elapsed = 0 
 	checker.startup = function()
-		if not private.isCalendarLoaded then 
+		Listener:Remove("ACTION_PROFILESESSION_EVENTS_BY_ANOTHER_ADDON", "CALENDAR_UPDATE_EVENT_LIST")
+		if not private.isCalendarLoaded and not private.isCalendarLoadedByAnotherAddon then 
 			Listener:Add("ACTION_PROFILESESSION_EVENTS", "CALENDAR_UPDATE_EVENT_LIST", function()
 				private.isCalendarLoaded = true 
 				if USE_DEBUG then 
@@ -994,6 +995,15 @@ end)
 Listener:Add("ACTION_PROFILESESSION_EVENTS", "PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
 	private.isCalendarLoaded = not isInitialLogin
 	Listener:Remove("ACTION_PROFILESESSION_EVENTS", "PLAYER_ENTERING_WORLD")
+end)
+
+Listener:Add("ACTION_PROFILESESSION_EVENTS_BY_ANOTHER_ADDON", "CALENDAR_UPDATE_EVENT_LIST", function()
+	if not private.isCalendarLoadedByAnotherAddon then 
+		private.isCalendarLoadedByAnotherAddon = true 
+		if USE_DEBUG then 
+			Print("[Debug] CalendarAPI initialized successfully by another addon!")
+		end 
+	end 
 end)
 
 -----------------------------------------------------------------
