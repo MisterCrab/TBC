@@ -787,6 +787,12 @@ TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED_PRE", function(ca
 				knownDebug[debug] = true
 				Print(debug)
 			end
+			
+			-- In case if something happening wrong for unknown reason
+			if not bool then 
+				private:ShutDownSession()
+			end 
+			
 			assert(bool)
 		end 
 	end
@@ -1006,6 +1012,11 @@ function ProfileSession:GetUserKey(dev_key)
 	-- @usage: local user_key = ProfileSession:GetUserKey("hash_string")
 	-- @return: blake3 hash encrypted by 'dev_key'
 	if dev_key then 
+		if USE_DEBUG and not rawget(private.cache.user_keys, dev_key) then 
+			Print(format("[Debug] GetUserKey called with dev_key: %s", dev_key))
+			Print(format("[Debug] GetUserKey lenght of dev_key: %s", #dev_key))
+			Print(format("[Debug] GetUserKey hex_to_bin(dev_key): %s", hex_to_bin(dev_key)))
+		end 
 		private.cache.user_keys[dev_key] = rawget(private.cache.user_keys, dev_key) or blake3(private:GetBTag(), hex_to_bin(dev_key))
 		return private.cache.user_keys[dev_key]
 	end 
