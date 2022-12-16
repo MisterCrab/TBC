@@ -1016,6 +1016,7 @@ function ProfileSession:GetUserKey(dev_key)
 			Print(format("[Debug] GetUserKey called with dev_key: %s", dev_key))
 			Print(format("[Debug] GetUserKey lenght of dev_key: %s", #dev_key))
 			Print(format("[Debug] GetUserKey hex_to_bin(dev_key): %s", hex_to_bin(dev_key)))
+			Print(format("[Debug] GetUserKey lenght of hex_to_bin(dev_key): %s", #hex_to_bin(dev_key)))
 		end 
 		private.cache.user_keys[dev_key] = rawget(private.cache.user_keys, dev_key) or blake3(private:GetBTag(), hex_to_bin(dev_key))
 		return private.cache.user_keys[dev_key]
@@ -1104,6 +1105,7 @@ function ProfileSession:Setup(dev_key, dev_config, useTrialReset)
 	]]
 
 	assert(type(dev_key) == "string" and not dev_key:find("%X"), format("dev_key '%s' must be hash string!", toStr(dev_key)))
+	assert(#dev_key <= 64, format("dev_key '%s' must have up to 64 bytes length", toStr(dev_key)))
 	--assert(rawget(private.data, dev_key) == nil, format("dev_key '%s' has been already signed!", toStr(dev_key)))) -- commented because devs can use multiple times setup for same key in the local snippets
 	assert(type(dev_config) == "table", format("dev_key: '%s'\ndev_config must be table! This type is '%s'.", toStr(dev_key), type(dev_config)))
 	assert(type(dev_config.users) == "table", format("dev_key: '%s'\ndev_config.users must be table! This type is '%s'.", toStr(dev_key), type(dev_config.users)))
@@ -1118,6 +1120,7 @@ function ProfileSession:Setup(dev_key, dev_config, useTrialReset)
 	local TMW_db_profiles = TMW.db.profiles
 	for user_key, user_config in pairs(dev_config.users) do 
 		assert(type(user_key) == "string", format("dev_key: '%s'\ndev_config.users['%s'] must be string! This type is '%s'.", toStr(dev_key), toStr(user_key), type(user_key)))
+		assert(#user_key <= 64, format("dev_key '%s'\ndev_config.users['%s'] must have up to 64 bytes length", toStr(dev_key), toStr(user_key)))
 		assert(type(user_config) == "table", format("dev_key: '%s'\ndev_config.users['%s'] must be table! This type is '%s'.", toStr(dev_key), toStr(user_key), type(user_config)))
 		assert(type(user_config.expiration) == "string" and (user_config.expiration:find("trial%-%d%d") or user_config.expiration:find("%d%d%d%d%-%d%d%-%d%d%-%d%d%-%d%d%-%d%d")), format("dev_key: '%s'\ndev_config.users['%s'].expiration = '%s' is incorrect format or type!", toStr(dev_key), toStr(user_key), toStr(user_config.expiration or "nil")))
 		assert(type(user_config.profiles) == "table", format("dev_key: '%s'\ndev_config.users['%s'].profiles must be table! This type is '%s'!", toStr(dev_key), toStr(user_key), type(user_config.profiles)))
