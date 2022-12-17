@@ -108,6 +108,9 @@ local FoodAndDrink 									= {
 	[GetSpellInfo(25691)] 							= true, -- Brain Food (unknown what does it exactly trigger)
 	[GetSpellInfo(30020)] 							= true,	-- First Aid
 }
+local FoodAndDrinkBlacklist 						= {
+	[GetSpellInfo(396092) or ""]					= true, -- Well Fed
+}
 local function IsDrinkingOrEating()
 	-- @return boolean 
 	local auraName
@@ -115,7 +118,7 @@ local function IsDrinkingOrEating()
 		auraName = UnitBuff(player, i, "HELPFUL PLAYER")
 		if not auraName then 
 			break 
-		elseif FoodAndDrink[auraName] then 
+		elseif FoodAndDrink[auraName] and not FoodAndDrinkBlacklist[auraName] then 
 			return true 
 		end 
 	end 
