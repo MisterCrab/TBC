@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "17.12.2022"
+local DateTime 														= "19.12.2022"
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -14762,7 +14762,7 @@ function Action.ToggleMainUI()
 					
 					if useAutoHide then 
 						-- If not exists 
-						if not unitSkip and ((unitID ~= "focus" and not unitToGUID[unitID]) or (unitID == "focus" and not Action.Unit(unitID):IsExists())) then 
+						if not unitSkip and ((unitID ~= "focus" and not unitToGUID[unitID]) or (unitID == "focus" and (guidToUnit[unitID] or not Action.Unit(unitID):IsExists()))) then 
 							unitSkip 		= true 
 						end 
 						
