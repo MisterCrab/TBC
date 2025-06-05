@@ -52,6 +52,7 @@ Modules\Dependences\PetLibrary.lua
 Modules\Engines\Base.lua
 Modules\Engines\Combat.lua
 Modules\Engines\HealingEngine.lua
+Modules\Engines\MetaEngine.lua
 Modules\Engines\MultiUnits.lua
 Modules\Engines\Player.lua
 Modules\Engines\Unit.lua

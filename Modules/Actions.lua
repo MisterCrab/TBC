@@ -555,6 +555,9 @@ end
 local DataSpellRanks = {}
 local DataIsSpellUnknown = {}
 function A.UpdateSpellBook(isProfileLoad)
+	local ShowAllSpellRanks = GetCVar("ShowAllSpellRanks") or "1"
+	SetCVar("ShowAllSpellRanks", "1")
+	
 	A.WipeTableKeyIdentify()
 	wipe(DataSpellRanks)
 	wipe(DataIsSpellUnknown)
@@ -656,18 +659,25 @@ function A.UpdateSpellBook(isProfileLoad)
 					if not v.isRank then 
 						v.isRank = 0
 					end 
-				end 								 								
+				end 					
 			end 
 		end 
 	end 
-
+	
 	if isProfileLoad ~= true then 
 		TMW:Fire("TMW_ACTION_SPELL_BOOK_CHANGED")	  -- for [3] tab refresh 
 		--TMW:Fire("TMW_ACTION_RANK_DISPLAY_CHANGED") -- no need here since :Show method will be triggered 
 	end 
+	
+	SetCVar("ShowAllSpellRanks", ShowAllSpellRanks)
+	TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
 end 
 
+-- "LEARNED_SPELL_IN_TAB" > "TRAINER_UPDATE" > "SKILL_LINES_CHANGED"
+-- "LEARNED_SPELL_IN_TAB" new added
+-- "SKILL_LINES_CHANGED" new added / existing level (rank) update
 Listener:Add("ACTION_EVENT_SPELL_RANKS", "LEARNED_SPELL_IN_TAB", 		A.UpdateSpellBook)
+Listener:Add("ACTION_EVENT_SPELL_RANKS", "SKILL_LINES_CHANGED", 		A.UpdateSpellBook) 
 TMW:RegisterCallback("TMW_ACTION_TALENT_MAP_UPDATED", function()
 	A.UpdateSpellBook()
 end)
@@ -1299,6 +1309,7 @@ end
 -------------------------------------------------------------------------------
 -- KeyName
 local function tableSearch(self, array)
+	if type(array) ~= "table" then return end
 	for k, v in pairs(array) do 
 		if type(v) == "table" and self == v then 
 			return k 
@@ -1378,7 +1389,7 @@ function A:GetItemInfo(custom)
 			return unpack(iteminfocache[ID]) 
 		elseif isTable then 
 			local spellName = self:GetItemSpell()			
-			return spellName or self:GetKeyName()
+			return spellName or self:GetKeyName() or ""
 		end
 	end 
 end
@@ -1445,7 +1456,11 @@ TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED", function()
 					err = (err or "Script found duplicate .TableKeyIdentify:\n") .. key .. " = " .. TableKeys[action:GetTableKeyIdentify()] .. ". Output: " .. action.TableKeyIdentify .. "\n"
 				else 
 					TableKeys[action:GetTableKeyIdentify()] = key 
-				end 				
+				end 	
+					
+				if action.Macro and #action.Macro > 255 then
+					err = (err or "") .. key .. " macro exceeds 255 bytes (" .. #action.Macro .. " current bytes)\n"
+				end
 			end 
 		end 
 		wipe(TableKeys)
@@ -1458,36 +1473,293 @@ end)
 
 -- Create action with args 
 function A.Create(args)
-	--[[@usage: args (table)
+	--[[@usage: args (@table)
 		Required: 
-			Type (@string)	- Spell|SpellSingleColor|Item|ItemSingleColor|Potion|Trinket|TrinketBySlot|ItemBySlot|SwapEquip (TrinketBySlot, ItemBySlot is only in CORE!)
-			ID (@number) 	- spellID | itemID | textureID (textureID only for Type "SwapEquip")
-			Color (@string) - only if type is Spell|SpellSingleColor|Item|ItemSingleColor|SwapEquip, this will set color which stored in A.Data.C[Color] or here can be own hex 
-	 	Optional: 
-			Desc (@string) uses in UI near Icon tab (usually to describe relative action like Penance can be for heal and for dps and it's different actions but with same name)
-			BlockForbidden (@boolean) uses to preset for action fixed block valid 
-			QueueForbidden (@boolean) uses to preset for action fixed queue valid 
-			Texture (@number) valid only if Type is Spell|Item|Potion|Trinket|SwapEquip
-			FixedTexture (@number or @file) valid only if Type is Spell|Item|Potion|Trinket|SwapEquip
-			MetaSlot (@number) allows set fixed meta slot use for action whenever it will be tried to set in queue 
-			Hidden (@boolean) allows to hide from UI this action 
-			isStance (@number) will check in :GetCooldown cooldown timer by GetShapeshiftFormCooldown function instead of default, only if Type is Spell|SpellSingleColor			
-			isTalent (@boolean) will check in :IsCastable method condition through :IsTalentLearned(), only if Type is Spell|SpellSingleColor
-			isReplacement (@boolean) will check in :IsCastable method condition through :IsExists(true), only if Type is Spell|SpellSingleColor	
-			isRank (@number) will use specified rank for spell (additional frame for color below TargetColor), only if Type is Spell|SpellSingleColor			
-			isCP (@boolean) is used only for combo points with type Spell|SpellSingleColor to use as condition in Queue core, it's required to be noted manually due specific way of how it work
-			useMaxRank (@boolean or @table) will overwrite current ID by highest available rank and apply isRank number, example of table use {1, 2, 4, 6, 7}, only if Type is Spell|SpellSingleColor 
-			useMinRank (@boolean or @table) will overwrite current ID by lowest available rank and apply isRank number, example of table use {1, 2, 4, 6, 7}, only if Type is Spell|SpellSingleColor
-			skipRange (@boolean) will skip check in :IsInRange method which is also used by Queue system, only if Type is Spell|SpellSingleColor|Item|ItemSingleColor|Trinket|TrinketBySlot
-			Equip1, Equip2 (@function) between which equipments do swap, used in :IsExists method, only if Type is SwapEquip
-			... any custom key-value will be inserted also 
-						
-		So the conception of Classic is to use own texture for any ranks and additional frame which will determine rank whenever it need, we assume what by default no need to determine rank if we use useMaxRank
-		Otherwise it will interract with additional frame  
+			Type (@string)					- Spell|SpellSingleColor|Item|ItemSingleColor|Potion|Trinket|TrinketBySlot|HeartOfAzeroth|SwapEquip|Script
+			ID (@number) 					- spellID | itemID | textureID, textureID used only for SwapEquip|Script
+			Color (@string) 				- only if Type is SpellSingleColor|ItemSingleColor but optionally supported by Spell|Item|SwapEquip|Script, hex or upper-case name of color in A.Data.C[Color]
+			Equip1, Equip2 (@function) 		- only if Type is SwapEquip, used in A:IsExists() to determine between which equipments do swap
+	 	Optional:			
+			Desc (@string) 					- description used in A:GetTableKeyIdentify and in UI in the Actions tab in Desc ceil 
+			Hidden (@boolean) 				- hides action from UI and skips it in MetaEngine
+			QueueForbidden (@boolean) 		- if true, user will not be able to set queue on it
+			BlockForbidden (@boolean)		- if true, user will not be able to set blocker on it
+			Texture (@number) 				- only if Type is Spell|Item|Potion|Trinket|HeartOfAzeroth|SwapEquip, sets texture from Spell|Item data base
+			FixedTexture (@number or @file) - only if Type is Spell|Item|Potion|Trinket|SwapEquip, sets texture from texture data base
+			MetaSlot (@number) 				- shows action in predetermined meta-slot when its queued
+			CP (@number)					- combo points to check in A:SetQueue()
+			isCP (@boolean) 				- A:SetQueue will check CP or at least one
+		Optional-Relative:
+			covenantID (@number) 			- [Shadowlans] A:IsReady, A:IsCastable and such will check A:IsCovenantAvailable(), requires Spell|SpellSingleColor	as Type		
+			isRank (@number) 				- [Classics] will use specified rank of spell through additional frame, requires Spell|SpellSingleColor as Type			
+			useMaxRank (@boolean or @table) - [Classics] will overwrite current ID by highest available rank and sets isRank, example of @table {1, 2, 4, 6, 7}, requires Spell|SpellSingleColor as Type
+			useMinRank (@boolean or @table) - [Classics] will overwrite current ID by lowest available rank and sets isRank, example of @table {1, 2, 4, 6, 7}, requires Spell|SpellSingleColor as Type			
+			isStance (@number) 				- uses GetShapeshiftFormCooldown instead of A:GetCooldown() for number of stance, requires Spell as Type
+			isTalent (@boolean) 			- A:IsReady, A:IsCastable and such will check A:IsTalentLearned(), requires Spell|SpellSingleColor|HeartOfAzeroth as Type
+			isReplacement (@boolean) 		- A:IsReady, A:IsCastable and such will check A:IsExists(true), requires Spell|SpellSingleColor|HeartOfAzeroth as Type
+			skipRange (@boolean) 			- A:IsInRange will always return true, used on actions with indirect ranges (AoE), requires Spell|SpellSingleColor|Item|ItemSingleColor|Trinket|TrinketBySlot|HeartOfAzeroth as Type		
+			... 							- any custom key-value will be inserted also 
+
+			
+		<|> MetaEngine <|>
+		All settings below are processed during initialization. Actions are skipped if they have Hidden = true or if MetaEngine is not available.
+		Each created action can be used in one of the following ways:
+			1) Action:ExecuteScript() method:
+				@required
+					Type = "Script"
+					Script (@string) wraps script in restricted env, can be used in-combat. Built-in variables:
+						this1-this10 used as reference to active meta-button, 									this6 -- unavailable, 		this -- w/o number is reference to shared container
+						this1click-this10click used as reference to click-button of the Active meta-button, 	this6click -- unavailable, 	thisclick -- is reference to click-button of the HealingEngine
+						thisclick6-thisclick10 used as reference to click-button of the Passive meta-slot
+				@optional
+					Refs (@table) will SetFrameRef, allows you to reference added frames in Script. Example:
+						Refs = {
+							["name"] = frame,
+						}
+					Name (@string) name of script, used to replace return in :Info() method just for visual appearance in UI.
+					
+			2) Action:Show(), Action.Hide() methods:					
+				@required
+					IsAntiFake (@boolean) used to make action act as an active meta-button in associated slots, otherwise active meta-buttons on [1]-[2],[7]-[10] will not perform it.
+				@optional
+					Refs (@table) will SetFrameRef, allows you to reference added frames in Script. Example:
+						Refs = {
+							["name"] = frame,
+						}
+					Script (@string) wraps script in restricted env at the end of action wrapper, can be used in-combat. Built-in variables are same as in Type = "Script" (see above)
+					Macro (@string) should be short as much as it possible, macro is limited up to 255 bytes where ~45 bytes should be left reserved for multi-chain, multiline is supported.
+									accepts patterns: "spell:12345" will be replaced by spellName taken from numbers
+													  "thisID" will be replaced by self.SlotID or self.ID
+													  "(Rank %d+)" will replace Rank by localized word
+													  any pattern can be combined like "spell:thisID(Rank 1)"
+					MacroForbidden (@boolean) if true, user will not be able to set and overwrite macro.
+					Click (@table) used to configure click-button of the meta-slot
+						Click = {
+							-- if any of the keys are missing then their corresponded key-val will be created automatically
+							autounit = "help" or "harm" or "both", 	-- auto set unit based on meta-slot and prioritizes unit depending on value with combination of toggles, examples:
+																	-- meta6 with autounit = "both" for Tranquilizing Shot and Purge will set [@raid1,harm][@party1,harm][@arena1,harm][@raid1,help][@party1,help]
+																	-- meta6 with autounit = "help" for Tranquilizing Shot and Purge will set [@raid1,help][@party1,help]
+																	-- meta6 with autounit = "harm" for Tranquilizing Shot and Purge will set [@raid1,harm][@party1,harm][@arena1,harm]
+																	-- meta3 with autounit = "both" for Holy Shock will set [@mouseover,exists][@focus,help][@target,help][@target,harm][@focustarget,harm][@targettarget,harm][@player]
+																	-- meta3 with autounit = "help" for Holy Shock will set [@mouseover,help][@focus,help][@target,help][@player]
+																	-- meta3 with autounit = "harm" for Holy Shock will set [@mouseover,harm][@target,harm][@focustarget,harm][@targettarget,harm][@player]
+							-- OR --
+							unit = "unitID",						-- as you can see autounit will not set "player" and "cursor" in many cases, this is why Death and Delay and such spells must be manually adjusted as unit = "player" without using autounit
+
+							type = "spell" or "item" or ..., 		-- cannot be "macro" here, skip it unless you gonna use something especial like "toy" or "action" button as automatically only sets "spell" or "item"
+							typerelease = type, 					-- must be same as type
+							spell = spellID or "spellName",			-- if type and typerelease is "spell"
+							item = itemID or "itemName",			-- if type and typerelease is "item"
+							... 									-- any custom key(@string)-value(@string,@boolean,@number) will be inserted also
+						}
+				Only Macro will take effect if Click and Macro both are set	but preferable choice is Click instead of Macro (see below), without MacroForbidden user will able to set own macro through UI which will lead to take priority over set in profile Macro and Click.
+				If Macro/Click is omit then it will automatically generate one of them.
+
+		Fast Track
+			All about which you should care is /castsequence|[@player]|[@cursor] and setting IsAntiFake, the other things are plug and play.
+
+		Additional notes
+			MetaEngine has own taint paths, attempting to penetrate it will not only disable MetaEngine, but also may uninstall it.
+			MetaEngine by default works inside of A[1]-A[10] functions and HealingEngine, although through callback it can be used anywhere as long as actions are created.
+			
+			Calling same action will not be performed twice until it will be rotated. Repeatedly call ExecuteScript is not possible within same iteration.
+			The main purpose of using Script is to update toggles and perform other buttons to inherit its attributes and pass them to the active meta-button, for example:
+				Refs = { ["ToT"] = _G.ToT }
+				Script = 'local ToTMacro = self:GetFrameRef("ToT"):GetAttributes("macrotext"); this3:SetAttribute("macrotext", ToTMacro); this3:SetAttribute("macroactive", ToTMacro)'
+			That's it, you just connected the usual API to the MetaEngine for the 3rd active meta-button. "macroactive" is used to maintain the macrotext of ToTMacro in "macrotext" of meta-button when chained.
+			Alternatively, you can just set Click to click your button:
+				Click = {
+					type = "click",
+					clickbutton = _G.ToT,
+				}
+			Or through Macro:
+				Macro = "/click ".._G.ToT:GetName()
+			
+			All General and HealingEngine actions are pre-allocated:
+			/tar 	arena1-5, party1-4, player, partypet1-4, raid1-40, raidpet1-40, mouseover, focus
+			/focus  arena1-5, party1-4, player, partypet1-4, raid1-40, raidpet1-40
+			/use 13, 14, any Healthstone, any HealingPotion (see Core.lua)
+			/stopcasting, /targetenemy, /targetlasttarget, /startattack, /stopattack
+			
+			
+			Structure and construction:
+				-- Means
+				@all 			- defined actions from Action[owner], Core.lua and undefined actions from Constans.lua, where owner is Action.PlayerSpec if Retail, otherwise Action.PlayerClass
+				@core			- defined actions from Core.lua and undefined actions from Constans.lua
+				N/A 			- not available
+				%expression% 	- value of expression
+				.. 				- concatenation
+				...				- everything
+				|				- operator "or"
+				:				- taken from
+				=>				- equal to
+				→				- next priority on chain
+				DOWN 			- on event of click or press down
+				UP				- on event of click or press up
+
+				-- Active
+				  slot	 description	  				variables	      			nameUI 						actions
+				• [1]  Active meta-button 			this1,  this1click  		"AntiFake CC"					only if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target 
+				• [2]  Active meta-button 			this2,  this2click  		"AntiFake Interrupt"			only if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target
+				• [5]  Active meta-button 			this5,  this5click  		"Trinket Rotation"				@all, 					   autounit resolves unit to mouseover, target, focustarget, targettarget (harm) and player
+				• [7]  Active meta-button 			this7,  this7click  		"AntiFake CC Focus"				only if action.IsAntiFake, autounit resolves unit to focus
+				• [8]  Active meta-button 			this8,  this8click  		"AntiFake Interrupt Focus"		only if action.IsAntiFake, autounit resolves unit to focus
+				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC Focus2"			only if action.IsAntiFake, autounit resolves unit to focus
+				• [10] Active meta-button 			this10, this10click 		"AntiFake Interrupt Focus2"		only if action.IsAntiFake, autounit resolves unit to focus
+					Attributes						
+						this%slot%: 
+							"pressAndHoldAction", true
+							"type", "macro"
+							"macroactive", action:GetMacro() - OR - this%slot%click=>action.Click
+							"macrotext", macroactive
+							"typerelease", "click"
+							"clickbutton", this
+							... -- custom attributes by Script
+						this%slot%click:
+							"pressAndHoldAction", true
+							"type", "spell|item|..." -- cannot be "macro" here
+							"spell|item|...", spellID|itemID|...
+							"unit", unitID
+							"autounit", "harm|help|both"
+							... -- custom attributes from Click table or set by Script
+					DOWN 	this%slot%:"macrotext"=>this%slot%:"macroactive" →
+					UP 		this:"macrotext"=>this:"macropassive"..thisclick
+				  slot	 description	  				variables	      			nameUI 						actions	
+				• [3]  Active meta-button 			this3, this3click  			"Rotation"						@all, autounit resolves unit to mouseover,focus,target,focustarget,targettarget
+				• [4]  Active meta-button 			this4, this4click  			"Secondary Rotation"			@all, autounit resolves unit to mouseover,focus,target,focustarget,targettarget
+					Attributes
+							same as above except
+						this%slot%:
+							"clickbutton", thisclick|this -- depending on "toggleprioritizepassive"
+					DOWN 	this%slot%:"macrotext"=>this:"macropassive"..this%slot%:"macroactive" →
+					UP 		thisclick:"target|focus"
+
+				-- Passive
+				  slot	 description	  				variables	      			nameUI 						actions
+				• [6]  Passive Rotation Unit1		this, thisclick6				N/A							@all, autounit resolves unit to arena1,raid1,party1
+				• [7]  Passive Rotation Unit2		this, thisclick7				N/A							@all, autounit resolves unit to arena2,raid2,party2
+				• [8]  Passive Rotation Unit3		this, thisclick8				N/A							@all, autounit resolves unit to arena3,raid3,party3
+				• [9]  Passive Rotation Unit4		this, thisclick9				N/A							@all, autounit resolves unit to arena4,raid4,party4
+				• [10] Passive Rotation Unit5		this, thisclick10				N/A							@all, autounit resolves unit to arena5,raid5,player
+					Attributes							
+						this: 
+							"pressAndHoldAction", true
+							"typerelease", "macro"
+							"macropassive%slot%", action:GetMacro() - OR - thisclick%slot%=>action.Click
+							"macropassive", "macropassive"6-10
+							"macrotext", macropassive..thisclick
+							"hasfocus" true if not vanilla classic
+							"toggleraid" => GetToggle(9, "MetaEngine").raid
+							"toggleparty" => GetToggle(9, "MetaEngine").party
+							"togglearena" => GetToggle(9, "MetaEngine").arena
+							"togglemouseover" => GetToggle(2, "mouseover")
+							"togglefocus" => GetToggle(2, "focus")
+							"togglefocustarget" => GetToggle(2, "focustarget")
+							"toggletargettarget" => GetToggle(2, "targettarget")
+							"togglehealer" => A.IamHealer
+							"toggleprioritizepassive" => GetToggle(9, "MetaEngine").PrioritizePassive
+							"togglecheckselfcast" => GetToggle(9, "MetaEngine").checkselfcast 
+							-- => nil/true/false is enabled/enabled/disabled, if toggle is missing that considered as nil => enabled, focustarget and targettarget will be disabled if not A.IamHealer, focus and focustarget will be disabled on vanilla classic
+							"state-%unitID%", "harm|help|unexists" -- target,focus,mouseover,targettarget,focustarget,party1-4,arena1-5,raid1-5
+							... -- custom attributes by Script
+						thisclick%slot%: 
+							"pressAndHoldAction", true
+							"type", "spell|item|..." -- cannot be "macro" here
+							"typerelease", type
+							"spell|item|...", spellID|itemID|...
+							"unit", unitID
+							"autounit", "harm|help|both"
+							... -- custom attributes from Click table or set by Script
+
+				-- Special
+				  slot	 							  	variables	      			nameUI 						actions
+				• ["Script"] 							all							action:Info() (Actions tab)	action:ExecuteScript()
+				• ["HealingEngine"]  					thisclick					N/A							/tar 	party1-4, player, partypet1-4, raid1-40, raidpet1-40, focus
+																												/focus 	party1-4, player, partypet1-4, raid1-40, raidpet1-40
+					Attributes						
+						thisclick:
+							"pressAndHoldAction", true
+							"typerelease", "target|focus"
+							"unit", unitID -- party1-4, player, partypet1-4, focus, raid1-40, raidpet1-40
+							... -- custom attributes by Script
+
+			Since project was developed to share [7]-[10] at the same time as passive rotation and active buttons for AntiFake CC Focus and AntiFake Interrupt Focus, such actions for active button must be defined with IsAntiFake:
+				• Active [7] AntiFake CC Focus			=> action.IsAntiFake = true
+				• Active [8] AntiFake Interrupt Focus	=> action.IsAntiFake = true
+				• Active [9] AntiFake CC2 Focus			=> action.IsAntiFake = true
+				• Active [10] AntiFake Interrupt2 Focus	=> action.IsAntiFake = true			
+
+			Therefore, UI is configured to show up only active meta-buttons with which user can interact to respect old-developed conception because of that this6 and this6click variables have no refences and don't exist, since HealingEngine is not a meta-button at all, it's also not present in the UI 
+			The manipulation with this7-10 and this7-10click actually does it on AntiFakeCCFocus, AntiFakeInterruptFocus, AntiFakeCCFocus2, AntiFakeInterruptFocus2 which are the active meta-buttons of 7-10 meta-slots, while keeping the passive slots 6-10 working through manipulation with this, thisclick6-10
+
+			HealingEngine integrated inside of active meta-buttons on click up event
+			HealingEngine has A[1]-A[10] function-independent OnUpdate frame, and its priority order doesn't really matters
+			
+			Each active meta-button can perform actions according to the structure above
+			Keypressing [1]-[2],[5],[7]-[10] of active meta-button chains: Active meta-button → Passive [6]→[10] → HealingEngine
+			Keypressing [3]-[4] of active meta-button chains: Passive [6]→[10] → Active meta-button → HealingEngine
+			Keypressing priority can be changed in UI by PrioritizePassive toggle for [3]-[4]
+			
+			Since TWW the macro body has max limit of 255 bytes and can't click buttons that would execute other macros, this is not enough to perform only on macros full multi-chain such as A[6]→A[7]→A[8]→A[9]→A[10]→A[3]→HealingEngine per one keypress especially when macro have russian or chinese letters which consumes 2 bytes per letter instead of 1.
+			To mitigate this issue each keypress will perform 'A' scenario on down and then 'B' scenario on up, each event will remap self button to other no-macro buttons or perform combination of macros.
+			As result, ~45 bytes should be left reserved for multi-chain if macros are used.
+			Now, if lazy profile developer didn't read till this he might will use something like that:
+				A.Spell.Macro = "/cast [@mouseover,help][@focus,help][]Благословенная свобода" through "/cast [@mouseover,help][@focus,help][]spell:1044"
+				39 + 21*2 = 81 bytes
+			What if lazy developer will set such macros for passive?
+				A.Unit1Spell.Macro = "/cast [@raid1,exists][@party1,exists]Благословенная свобода"
+				38 + 21*2 = 80 bytes
+			What will happen on multi-chain when all of them are up?
+				/cast [@raid1,exists][@party1,exists]Благословенная свобода -- 80 bytes +1 byte from \n
+				/cast [@raid2,exists][@party2,exists]Благословенная свобода -- 80 bytes +1 byte from \n
+				/cast [@raid3,exists][@party3,exists]Благословенная свобода -- 80 bytes +1 byte from \n
+				/cast [@raid--ooops bro 255 bytes limit, the rest is cutted-off
+			How it should be mitigated?
+				A.Unit1Spell.Macro = ""
+				A.Unit1Spell.Click = { autounit = "help", type = "spell", spell = 1044 }
+				- OR -
+				A.SpellRaid1.Click = { unit = "raid1" }
+				A.SpellRaid2.Click = { unit = "raid2" }
+				A.SpellRaid3.Click = { unit = "raid3" }
+				A.SpellParty1.Click = { unit = "party1" }
+				A.SpellParty2.Click = { unit = "party2" }
+				A.SpellParty3.Click = { unit = "party3" }
+				- OR -
+				A.Unit1Spell.Macro = nil
+				A.Unit1Spell.Click = nil
+				just do nothing, as mentioned before, such keys will be auto generated, although they cannot automatically determine when action should be used as /cast [@player] or [@cursor] or /castsequence, therefore, they need to be defined manually
+				
+
+		Functions
+			function Action.MetaEngine:GetErrorCodes()
+				-- @return table
+				-- log of errors
+			end
+
+			function Action.MetaEngine:IsSafe()
+				-- @return boolean
+				-- is authorized
+			end
+
+			function Action.MetaEngine:IsHealthy()
+				-- @return boolean
+				-- is in work-able configuration, indicates it's running
+			end
+			
+		Callbacks
+			TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")												-- used out of combat to refresh everything, if used in combat it will queue up pending reconfigure on the next out of combat event
+			TMW:Fire("TMW_ACTION_METAENGINE_REASSIGN"[, slot, bind])									-- used out of combat to refresh bindings
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", slot or "Script" or "HealingEngine", action[, "unitID" or textureID])
+			Examples
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", 3, Action.BlessingofFreedom)
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", 6, Action, CONST_STOPCAST)
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "HealingEngine", "target" or "focus", "unitID") 	-- unitID: raid1-40, raidpet1-40, party1-4, partypet1-4, player, focus. Used and controlled by HealingEngine.lua, attempting to use it with profile code will result in conflict
 	]]
-	local arg 	= args or {}	
-	arg.Desc 	= arg.Desc or ""
-	arg.SubType = arg.Type
+	local action
+	local arg			= args or {}	
+	arg.Desc 			= arg.Desc or ""
+	arg.SubType 		= arg.Type
+	arg.Macro 			= arg.Macro or ""
 	
 	-- Type "Spell" 
 	if arg.Type == "Spell" then 	
@@ -1534,7 +1806,13 @@ function A.Create(args)
 			tsort(arg.useMinRank)
 		end 
 
-		return setmetatable(arg, { __index = A }) 
+		-- ActionObj
+		action = setmetatable(arg, { __index = A }) 
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 
 	
 	-- Type "Spell" 
@@ -1557,7 +1835,13 @@ function A.Create(args)
 			tsort(arg.useMinRank)
 		end 	
 		
-		return setmetatable(arg, { __index = A })
+		-- ActionObj
+		action = setmetatable(arg, { __index = A })
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 
 	
 	-- Type "Trinket", "Potion", "Item"
@@ -1597,13 +1881,19 @@ function A.Create(args)
 		arg.Item = TMW.Classes.ItemByID:New(arg.ID)
 		ItemIDs[#ItemIDs + 1] = arg.ID
 		
-		return setmetatable(arg, { __index = function(self, key)
+		-- ActionObj
+		action = setmetatable(arg, { __index = function(self, key)
 			if A[key] then
 				return A[key]
 			else
 				return self.Item[key]
 			end
 		end })
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 	
 	
 	-- Type "Trinket", "Item"
@@ -1642,9 +1932,11 @@ function A.Create(args)
 		if arg.Item:GetID() then 	
 			ItemIDs[#ItemIDs + 1] = arg.Item:GetID()
 		end 
-		arg.ID = nil
 		
-		return setmetatable(arg, { __index = function(self, key)
+		-- ActionObj
+		arg.SlotID = arg.ID -- fix for MacroAPI in Action:SetDefaultMacro() function
+		arg.ID = nil
+		action = setmetatable(arg, { __index = function(self, key)
 			if key == "ID" then 
 				return self.Item:GetID()
 			end 
@@ -1655,6 +1947,11 @@ function A.Create(args)
 				return self.Item[key]
 			end
 		end })
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 
 	
 	-- Type "Item"
@@ -1671,13 +1968,19 @@ function A.Create(args)
 		arg.Item = TMW.Classes.ItemByID:New(arg.ID)
 		ItemIDs[#ItemIDs + 1] = arg.ID
 		
-		return setmetatable(arg, { __index = function(self, key)
+		-- ActionObj
+		action = setmetatable(arg, { __index = function(self, key)
 			if A[key] then
 				return A[key]
 			else
 				return self.Item[key]
 			end
 		end })
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 	
 	
 	-- Type "SwapEquip"	
@@ -1720,8 +2023,60 @@ function A.Create(args)
 			end 
 		end	
 		
-		return setmetatable(arg, { __index = A })	
+		-- ActionObj
+		action = setmetatable(arg, { __index = A })
+		
+		-- MetaEngine
+		action:SetDefaultAction()
+		
+		return action
 	end 
+	
+	-- Type "Script" (MetaEngine)
+	if arg.Type == "Script" then
+		arg.ID = arg.ID or CONST.PAUSECHECKS_DISABLED
+		-- Methods Remap
+		arg.Info = function()
+			return arg.Name or "Script"
+		end 
+		arg.Link = arg.Info		
+		arg.Icon = function()
+			return arg.ID 
+		end 
+		if arg.Color then 
+			if arg.Texture then 
+				arg.TextureID = arg.Texture
+				arg.Texture = function()
+					return A.GetColoredSwapTexture(arg, arg.TextureID)
+				end 
+			elseif arg.FixedTexture then 
+				arg.Texture = function()
+					return "texture", arg.FixedTexture
+				end 				
+			else 
+				arg.Texture = A.GetColoredSwapTexture
+			end 		
+		else 		
+			if arg.Texture then 
+				arg.TextureID = arg.Texture
+				arg.Texture = function()
+					return "texture", arg.TextureID
+				end 
+			elseif arg.FixedTexture then 
+				arg.Texture = function()
+					return "texture", arg.FixedTexture
+				end 				
+			else 
+				arg.Texture = function()
+					return "texture", arg.ID
+				end 
+			end 
+		end	
+		
+		arg.QueueForbidden = true
+		arg.MacroForbidden = true
+		return setmetatable(arg, { __index = A })
+	end
 	
 	-- nil
 	arg.Hidden = true 		

@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "19.12.2022"
+local DateTime 														= "05.06.2025" -- ToDo: actual API is 19.12.2022 , fresh is just because of MetaEngine preparations
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -36,8 +36,8 @@ local isClassic														= _G.WOW_PROJECT_ID == _G.WOW_PROJECT_BURNING_CRUSA
 StdUi.isClassic 													= isClassic	  
 local owner															= isClassic and "PlayerClass" or "PlayerSpec" 
 
-local 	 GetRealmName, 	  GetExpansionLevel, 	GetFramerate, 	 GetMouseFocus,	   GetCVar,	   SetCVar,	   GetBindingFromClick,    GetSpellInfo = 
-	  _G.GetRealmName, _G.GetExpansionLevel, _G.GetFramerate, _G.GetMouseFocus, _G.GetCVar, _G.SetCVar, _G.GetBindingFromClick, _G.GetSpellInfo
+local 	 GetRealmName, 	  GetExpansionLevel, 	GetFramerate, 	 GetMouseFocus,	   GetCVar,	   SetCVar,	   GetBindingFromClick,	   GetBindingText,    GetSpellInfo = 
+	  _G.GetRealmName, _G.GetExpansionLevel, _G.GetFramerate, _G.GetMouseFocus, _G.GetCVar, _G.SetCVar, _G.GetBindingFromClick, _G.GetBindingText, _G.GetSpellInfo
 	  
 local 	 UnitName, 	  UnitClass,    UnitExists,    UnitIsUnit,    UnitGUID, 	UnitAura, 	 UnitPower,    UnitIsOwnerOrControllerOfUnit = 
 	  _G.UnitName, _G.UnitClass, _G.UnitExists, _G.UnitIsUnit, _G.UnitGUID,  _G.UnitAura, _G.UnitPower, _G.UnitIsOwnerOrControllerOfUnit	  
@@ -73,6 +73,7 @@ local CombatLogGetCurrentEventInfo									= _G.CombatLogGetCurrentEventInfo
 local CreateFrame 													= _G.CreateFrame	
 local PlaySound														= _G.PlaySound	  
 local InCombatLockdown												= _G.InCombatLockdown
+local IsAltKeyDown													= _G.IsAltKeyDown
 local IsControlKeyDown												= _G.IsControlKeyDown
 local IsShiftKeyDown												= _G.IsShiftKeyDown
 local ChatEdit_InsertLink											= _G.ChatEdit_InsertLink
@@ -138,6 +139,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000Macro already existed!|r",
 		MACROLIMIT = "|cffff0000Can't create macro, you reached limit. You need to delete at least one macro!|r",	
 		MACROINCOMBAT = "|cffff0000Can't create macro in combat. You need to leave combat!|r",
+		MACROSIZE = "|cffff0000Macro size can't exceed 255 bytes!|r",
 		GLOBALAPI = "API Global: ",
 		RESIZE = "Resize",
 		RESIZE_TOOLTIP = "Click-and-drag to resize",
@@ -192,6 +194,7 @@ local Localization = {
 			SAVEMOUSE = "Save Cursor Lists",
 			SAVEMSG = "Save MSG Lists",
 			SAVEHE = "Save Healing Engine Settings",
+			SAVEHOTKEYS = "Save Hotkeys Settings",
 			LUAWINDOW = "LUA Configure",
 			LUATOOLTIP = "To refer to the checking unit, use 'thisunit' without quotes\nCode must have boolean return (true) to process conditions\nThis code has setfenv which means what you no need to use Action. for anything that have it\n\nIf you want to remove already default code you will need to write 'return true' without quotes instead of remove them all",
 			BRACKETMATCH = "Bracket Matching",
@@ -212,6 +215,7 @@ local Localization = {
 			LANGUAGE = "[English]",
 			AUTO = "Auto",
 			SESSION = "Session: ",
+			PREVIEWBYTES = "Preview: %s bytes (255 max limit, 210 max recommended)",
 			[1] = {
 				HEADBUTTON = "General",	
 				HEADTITLE = "Primary",
@@ -674,6 +678,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Mana Conservation Effectiveness",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "Only affects the 'AUTO' healing abilities settings!\n\nThis is a multiplier on which pure healing will be calculated when the mana save phase was started\n\nThe higher the level, the more mana save, but less APM\n\nRight click: Create macro",
 			},		
+			[9] = {
+				HEADBUTTON = "Hotkeys",
+				FRAMEWORK = "[Each spec] Framework",
+				HOTKEYINSTRUCTION = "Press or click any hotkey or mouse button to assign",
+				META = "Meta",
+				METAENGINEROWTT = "Double Left Click assign hotkey\nDouble Right Click unassign hotkey",
+				ACTION = "Action",
+				HOTKEY = "Hotkey",
+				HOTKEYASSIGN = "Create",
+				HOTKEYUNASSIGN = "Unbind",
+				ASSIGNINCOMBAT = "|cffff0000Can't assign in combat!",
+				PRIORITIZEPASSIVE = "Prioritize Passive",
+				PRIORITIZEPASSIVETT = "Enabled: Rotation, Secondary Rotation will do passive rotation first, then native rotation on down click\nDisabled: Rotation, Secondary Rotation will do native rotation on down click, then passive rotation on up click",
+				CHECKSELFCAST = "checkselfcast",
+				CHECKSELFCASTTT = "Enabled: If the SELFCAST modifier is held down, resolves the unit to player on click buttons",
+				UNITTT = "Enables or disables click buttons for this unit in passive rotation",
+			},
 		},
 	},
 	ruRU = {
@@ -691,6 +712,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000Макрос уже существует!|r",
 		MACROLIMIT = "|cffff0000Не удается создать макрос, вы достигли лимита. Удалите хотя бы один макрос!|r",
 		MACROINCOMBAT = "|cffff0000Не удается создать макрос в бою. Вы должны выйти из боя!|r",
+		MACROSIZE = "|cffff0000Размер макроса не может превышать 255 байт!|r",
 		GLOBALAPI = "API Глобальное: ",	
 		RESIZE = "Изменить размер",
 		RESIZE_TOOLTIP = "Чтобы изменить размер, нажмите и тащите",	
@@ -745,6 +767,7 @@ local Localization = {
 			SAVEMOUSE = "Сохранить Списки Курсора",
 			SAVEMSG = "Сохранить Списки MSG",
 			SAVEHE = "Сохранить Настройки Системы Исцеления",
+			SAVEHOTKEYS = "Сохранить Настройки Клавиш",
 			LUAWINDOW = "LUA Конфигурация",
 			LUATOOLTIP = "Для обращения к проверяемому юниту используйте 'thisunit' без кавычек\nКод должен иметь логический возрат (true) для того чтобы условия срабатывали\nКод имеет setfenv, это означает, что не нужно использовать Action. для чего-либо что имеет это\n\nЕсли вы хотите удалить по-умолчанию установленный код, то нужно написать 'return true' без кавычек,\nвместо простого удаления",	
 			BRACKETMATCH = "Закрывать Скобки",
@@ -765,6 +788,7 @@ local Localization = {
 			LANGUAGE = "[Русский]",
 			AUTO = "Авто",
 			SESSION = "Сессия: ",
+			PREVIEWBYTES = "Предпросмотр: %s байтов (255 макс. лимит, 210 макс. рекомендуется)",
 			[1] = {
 				HEADBUTTON = "Общее",
 				HEADTITLE = "Основное",					
@@ -891,6 +915,9 @@ local Localization = {
 				KEY = "[Ключ: ",
 				KEYTOTAL = "[Суммарно Очереди: ",
 				KEYTOOLTIP = "Используйте этот ключ во вкладке 'Сообщения'",
+				MACRO = "Макрос",
+				MACROTOOLTIP = "Макрос должен быть коротким, размер макроса ограничен 255 байт\nпримерно 45 байт зарезервированы для мультицепочек, поддерживается многострочность\n\nЕсли макрос опущен, будет использовано автогенерируемое стандартное оформление:\n\"/cast [@unitID]spellName\" или \"/cast [@unitID]spellName(Rank %d)\" или \"/use item:itemID\"\n\nМакрос всегда должен добавляться к действиям, в которых есть что-то вроде\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\n\nПоддерживаются шаблоны:\n\"spell:12345\" будет заменено на имя заклинания, полученное по номеру\n\"thisID\" будет заменено на self.SlotID или self.ID\n\"(Rank %d+)\" заменит Rank на локализованное слово\nЛюбые шаблоны можно комбинировать, например \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "запрещен для изменения макроса!",
 				ISFORBIDDENFORBLOCK = "запрещен для установки в блокировку!",
 				ISFORBIDDENFORQUEUE = "запрещен для установки в очередь!",
 				ISQUEUEDALREADY = "уже в состоит в очереди!",
@@ -1229,6 +1256,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Эффективность Сохранения Маны",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "Влияет только на 'AUTO' настройки исцеляющих способностей!\n\nЭто множитель на которой будет скалькулировано чистое исцеление когда фаза сохранения маны была начата\n\nЧем выше уровень тем больше сохранения маны, но меньше APM\n\nПравая кнопка мышки: Создать макрос",
 			},					
+			[9] = {
+				HEADBUTTON = "Клавиши",
+				FRAMEWORK = "[Каждый спек] Каркас",
+				HOTKEYINSTRUCTION = "Нажмите или кликните любую горячую клавишу или кнопку мышки для назначения",
+				META = "Мета",
+				METAENGINEROWTT = "Двойной левый клик назначает горячую клавишу\nДвойной правый клик снимает назначение",
+				ACTION = "Действие",
+				HOTKEY = "Горячая клавиша",
+				HOTKEYASSIGN = "Создать",
+				HOTKEYUNASSIGN = "Отвязать",
+				ASSIGNINCOMBAT = "|cffff0000Нельзя назначить в бою!",
+				PRIORITIZEPASSIVE = "Приоритет пассивной ротации",
+				PRIORITIZEPASSIVETT = "Включено: Rotation, Secondary Rotation сначала выполнит пассивную ротацию, затем нативную при нажатии\nОтключено: Rotation, Secondary Rotation сначала выполнит нативную при нажатии, затем пассивную при отпускании",
+				CHECKSELFCAST = "Применять к себе",
+				CHECKSELFCASTTT = "Включено: Если удерживается модификатор SELFCAST, на кнопках клика целью будете вы",
+				UNITTT = "Включает или отключает кнопки клика для этого юнита в пассивной ротации",
+			},
 		},
 	},
 	deDE = {			
@@ -1246,6 +1290,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000Macro bereits vorhanden!|r",
 		MACROLIMIT = "|cffff0000Makrolimit erreicht, lösche vorher eins!|r",
 		MACROINCOMBAT = "|cffff0000Im Kampf kann kein Makro erstellt werden. Du musst aus dem Kampf herauskommen!|r",	
+		MACROSIZE = "|cffff0000Die Makrogröße darf 255 Bytes nicht überschreiten!|r",	
 		GLOBALAPI = "API Global: ",
 		RESIZE = "Größe ändern",
 		RESIZE_TOOLTIP = "Click-und-bewege um die Größe zu ändern",
@@ -1300,6 +1345,7 @@ local Localization = {
 			SAVEMOUSE = "Speicher Cursorliste",
 			SAVEMSG = "Speicher Nachrichtrenliste",
 			SAVEHE = "Einstellungen Heilsystem",
+			SAVEHOTKEYS = "Hotkey-Einstellungen speichern",
 			LUAWINDOW = "LUA Einstellung",
 			LUATOOLTIP = "Verwenden Sie 'thisunit' ohne Anführungszeichen, um auf die Prüfungseinheit zu verweisen.\nCode muss einen 'boolean' Rückgabewert (true) haben, um Bedingungen zu verarbeiten\nDieser Code hat setfenv, was bedeutet, dass Sie Action. nicht benötigen. für alles, was es hat\n\nWenn Sie bereits Standardcode entfernen möchten, müssen Sie 'return true' ohne Anführungszeichen schreiben, anstatt alle zu entfernen",
 			BRACKETMATCH = "Bracket Matching",
@@ -1320,6 +1366,7 @@ local Localization = {
 			LANGUAGE = "[Deutsche]",
 			AUTO = "Auto",
 			SESSION = "Session: ",
+			PREVIEWBYTES = "Vorschau: %s Bytes (255 Höchstgrenze, 210 empfohlen)",
 			[1] = {
 				HEADBUTTON = "General",	
 				HEADTITLE = "Primär",
@@ -1444,7 +1491,10 @@ local Localization = {
 				UNBLOCKED = "|cff00ff00Freigestellt: |r",
 				KEY = "[Schlüssel: ",
 				KEYTOTAL = "[Warteschlangensumme: ",
-				KEYTOOLTIP = "Benutze den Schlüssel im 'Mitteilungen' Fenster",  
+				KEYTOOLTIP = "Benutze den Schlüssel im 'Mitteilungen' Fenster", 
+				MACRO = "Makro",
+				MACROTOOLTIP = "Soll so kurz wie möglich sein, Makro ist auf 255 Bytes begrenzt\netwa 45 Bytes sollten für Mehrfachkette reserviert werden, Mehrzeilen werden unterstützt\n\nWenn das Makro weggelassen wird, wird die Standard-Autounit-Erstellung verwendet:\n\"/cast [@unitID]spellName\" oder \"/cast [@unitID]spellName(Rank %d)\" oder \"/use item:itemID\"\n\nMakro muss immer Aktionen hinzugefügt werden, die so etwas wie\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\nenthalten\n\nAkzeptiert Muster:\n\"spell:12345\" wird durch spellName ersetzt, abgeleitet von den Zahlen\n\"thisID\" wird durch self.SlotID oder self.ID ersetzt\n\"(Rank %d+)\" ersetzt Rank durch das lokalisierte Wort\nJedes Muster kann kombiniert werden, zum Beispiel \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "ist verboten, Makros zu ändern!",
 				ISFORBIDDENFORBLOCK = "Verboten für die Blocker!",
 				ISFORBIDDENFORQUEUE = "Verboten für die Warteschleife!",
 				ISQUEUEDALREADY = "Schon in der Warteschleife drin!",
@@ -1784,6 +1834,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Wirksamkeit der Manakonservierung",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "Beeinflusst nur die Einstellungen der 'AUTO'-Heilfähigkeiten!\n\nDies ist ein Multiplikator, anhand dessen die reine Heilung berechnet wird, wenn die Manasparphase gestartet wurde\n\n Je höher die Stufe, desto mehr Manasparen, aber weniger APM\n\nRechts klick: Makro erstellen",			
 			},		
+			[9] = {
+				HEADBUTTON = "Tastenkürzel",
+				FRAMEWORK = "[Jede Spezialisierung] Rahmenwerk",
+				HOTKEYINSTRUCTION = "Drücken oder klicken Sie eine beliebige Hotkey- oder Maustaste, um zuzuweisen",
+				META = "Meta",
+				METAENGINEROWTT = "Doppel-Linksklick weist Hotkey zu\nDoppel-Rechtsklick hebt Hotkey auf",
+				ACTION = "Aktion",
+				HOTKEY = "Hotkey",
+				HOTKEYASSIGN = "Erstellen",
+				HOTKEYUNASSIGN = "Lösen",
+				ASSIGNINCOMBAT = "|cffff0000Kann im Kampf nicht zuweisen!",
+				PRIORITIZEPASSIVE = "Passive Rotation priorisieren",
+				PRIORITIZEPASSIVETT = "Aktiviert: Rotation, Sekundärrotation führt zuerst passive Rotation aus, dann native Rotation beim Drücken\nDeaktiviert: Rotation, Sekundärrotation führt zuerst native Rotation beim Drücken aus, dann passive Rotation beim Loslassen",
+				CHECKSELFCAST = "Auf sich selbst anwenden",
+				CHECKSELFCASTTT = "Aktiviert: Wenn der SELFCAST-Modifikator gehalten wird, sind Sie bei Klick-Tasten das Ziel",
+				UNITTT = "Aktiviert oder deaktiviert Klick-Tasten für diese Einheit in der passiven Rotation",
+			},
 		},
 	},
 	frFR = {			
@@ -1800,7 +1867,8 @@ local Localization = {
 		MACRO = "Macro",
 		MACROEXISTED = "|cffff0000La macro existe déjà !|r",
 		MACROLIMIT = "|cffff0000Impossible de créer la macro, vous avez atteint la limite. Vous devez supprimer au moins une macro!|r",	
-		MACROINCOMBAT = "|cffff0000Impossible de créer une macro en combat. Vous devez quitter le combat!|r",	
+		MACROINCOMBAT = "|cffff0000Impossible de créer une macro en combat. Vous devez quitter le combat!|r",
+		MACROSIZE = "|cffff0000La taille de la macro ne peut pas dépasser 255 octets!|r",		
 		GLOBALAPI = "API Globale: ",
 		RESIZE = "Redimensionner",
 		RESIZE_TOOLTIP = "Cliquer et faire glisser pour redimensionner",
@@ -1855,6 +1923,7 @@ local Localization = {
 			SAVEMOUSE = "Sauvergarder la liste d'Curseur",
 			SAVEMSG = "Sauvergarder la liste d'Messages",
 			SAVEHE = "Sauvegarder les paramètres d'Système de guérison",
+			SAVEHOTKEYS = "Enregistrer les paramètres des raccourcis",
 			LUAWINDOW = "Configuration LUA",
 			LUATOOLTIP = "Pour se réferer à l'unité vérifié, utiliser 'thisunit' sans les guillemets\nLe code doit retourner un booléen (true) pour activer les conditions\nLe code contient setfenv ce qui siginfie que vous n'avez pas bessoin d'utiliser Action. pour tout ce qui l'a\n\nSi vous voulez supprimer le code déjà par défaut, vous devez écrire 'return true' sans guillemets au lieu de tout supprimer",
 			BRACKETMATCH = "Repérage des paires de\nparenthèse", 
@@ -2001,6 +2070,9 @@ local Localization = {
 				KEY = "[Key: ",
 				KEYTOTAL = "[Total de la file d'attente: ",
 				KEYTOOLTIP = "Utiliser ce mot clef dans l'onglet 'Messages'",
+				MACRO = "Macro",
+				MACROTOOLTIP = "Doit être aussi court que possible, le macro est limité à 255 octets\nenviron 45 octets doivent être réservés pour la chaîne multiple, le multilignes est pris en charge\n\nSi le Macro est omis, la construction autounit par défaut sera utilisée :\n\"/cast [@unitID]spellName\" ou \"/cast [@unitID]spellName(Rank %d)\" ou \"/use item:itemID\"\n\nLe Macro doit toujours être ajouté aux actions contenant quelque chose comme\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\n\nAccepte les motifs :\n\"spell:12345\" sera remplacé par spellName obtenu à partir des numéros\n\"thisID\" sera remplacé par self.SlotID ou self.ID\n\"(Rank %d+)\" remplacera Rank par le mot localisé\nTout motif peut être combiné, par exemple \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "il est interdit de changer de macro!",
 				ISFORBIDDENFORBLOCK = "est indertit pour la file bloquer!",
 				ISFORBIDDENFORQUEUE = "est indertit pour la file d'attente!",
 				ISQUEUEDALREADY = "est déjà dans la file d'attente!",
@@ -2337,6 +2409,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Efficacité de la conservation du mana",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "N'affecte que les paramètres des capacités de guérison 'AUTO'!\n\nC'est un multiplicateur sur lequel la guérison pure sera calculée lorsque la phase de sauvegarde de mana a été lancée\n\nPlus le niveau est élevé, plus de sauvegarde de mana, mais moins d'APM\n\nClic droit: Créer la macro",
 			},		
+			[9] = {
+				HEADBUTTON = "Raccourcis",
+				FRAMEWORK = "[Chaque spé] Cadriciel",
+				HOTKEYINSTRUCTION = "Appuyez ou cliquez sur n’importe quelle touche de raccourci ou bouton de souris pour assigner",
+				META = "Meta",
+				METAENGINEROWTT = "Double clic gauche pour assigner le raccourci\nDouble clic droit pour désassigner le raccourci",
+				ACTION = "Action",
+				HOTKEY = "Raccourci",
+				HOTKEYASSIGN = "Créer",
+				HOTKEYUNASSIGN = "Dissocier",
+				ASSIGNINCOMBAT = "|cffff0000Impossible d’assigner en combat !",
+				PRIORITIZEPASSIVE = "Prioriser rotation passive",
+				PRIORITIZEPASSIVETT = "Activé : Rotation, Rotation secondaire effectueront d’abord la rotation passive, puis la rotation native lors du clic enfoncé\nDésactivé : Rotation, Rotation secondaire effectueront d’abord la rotation native lors du clic enfoncé, puis la rotation passive lors du relâchement",
+				CHECKSELFCAST = "Appliquer à soi-même",
+				CHECKSELFCASTTT = "Activé : si le modificateur SELFCAST est maintenu, vous serez la cible des boutons de clic",
+				UNITTT = "Active ou désactive les boutons de clic pour cette unité en rotation passive",
+			},
 		},
 	},
 	itIT = {			
@@ -2354,6 +2443,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000La Macro esiste gia!|r",
 		MACROLIMIT = "|cffff0000Non posso creare la macro, hai raggiunto il limite. Devi cancellare almeno una macro!|r",
 		MACROINCOMBAT = "|cffff0000Impossibile creare macro in combattimento. Devi lasciare il combattimento!|r",	
+		MACROSIZE = "|cffff0000La dimensione della macro non può superare i 255 byte!|r",
 		GLOBALAPI = "API Globale: ",
 		RESIZE = "Ridimensiona",
 		RESIZE_TOOLTIP = "Seleziona e tracina per ridimensionare",
@@ -2407,6 +2497,8 @@ local Localization = {
 			SAVEDISPEL = "Salva liste Auree",
 			SAVEMOUSE = "Salva liste cursori",
 			SAVEMSG = "Salva liste MSG",
+			SAVEHE = "Salva liste Sistema di guarigione",
+			SAVEHOTKEYS = "Salva impostazioni tasti rapidi",
 			LUAWINDOW = "Configura LUA",
 			LUATOOLTIP = "Per fare riferimento all unità da controllare, usa il nome senza virgolette \nIl codice deve avere un valore(true) per funzionare \nIl codice ha setfenv, significa che non devi usare Action. \n\nSe vuoi rimpiazzare il codice predefinito, devi rimpiazzare con un 'return true' senza virgolette, \n invece di cancellarlo",
 			BRACKETMATCH = "Verifica parentesi",
@@ -2427,6 +2519,7 @@ local Localization = {
 			LANGUAGE = "[Italiano]",
 			AUTO = "Auto",
 			SESSION = "Sessione: ",
+			PREVIEWBYTES = "Anteprima: %s byte (limite massimo 255, 210 consigliati)",
 			[1] = {
 				HEADBUTTON = "Generale",	
 				HEADTITLE = "Primaria",
@@ -2553,6 +2646,9 @@ local Localization = {
 				KEY = "[Chiave: ",
 				KEYTOTAL = "[Totale coda: ",
 				KEYTOOLTIP = "Usa questa chiave nel tab 'Messaggi'",
+				MACRO = "Macro",
+				MACROTOOLTIP = "Deve essere il più breve possibile, il macro è limitato a 255 byte\ncirca 45 byte devono essere riservati per catene multiple, è supportato il multilinea\n\nSe il Macro viene omesso, verrà utilizzata la costruzione autounit predefinita:\n\"/cast [@unitID]spellName\" o \"/cast [@unitID]spellName(Rank %d)\" o \"/use item:itemID\"\n\nIl Macro deve sempre essere aggiunto ad azioni che contengono qualcosa come\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\n\nAccetta pattern:\n\"spell:12345\" verrà sostituito da spellName ottenuto dai numeri\n\"thisID\" verrà sostituito da self.SlotID o self.ID\n\"(Rank %d+)\" sostituirà Rank con la parola localizzata\nQualsiasi pattern può essere combinato, per esempio \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "è vietato cambiare macro!"
 				ISFORBIDDENFORBLOCK = "non può esser messo in blocco!",
 				ISFORBIDDENFORQUEUE = "non può esser messo in coda!",
 				ISQUEUEDALREADY = "esiste giá nella coda!",
@@ -2892,6 +2988,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Efficacia di conservazione del mana",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "Influisce solo sulle impostazioni delle abilità di guarigione 'AUTO'!\n\nQuesto è un moltiplicatore su cui verrà calcolata la guarigione pura all'avvio della fase di salvataggio del mana\n\nMaggiore è il livello, maggiore è il risparmio di mana, ma meno APM\n\nPulsanmte destro: Crea macro",
 			},					
+			[9] = {
+				HEADBUTTON = "Tasti di scelta rapida",
+				FRAMEWORK = "[Ogni spec] Struttura",
+				HOTKEYINSTRUCTION = "Premi o clicca qualsiasi tasto rapido o pulsante del mouse per assegnare",
+				META = "Meta",
+				METAENGINEROWTT = "Doppio clic sinistro per assegnare il tasto rapido\nDoppio clic destro per rimuovere l’assegnazione",
+				ACTION = "Azione",
+				HOTKEY = "Tasto rapido",
+				HOTKEYASSIGN = "Crea",
+				HOTKEYUNASSIGN = "Disassocia",
+				ASSIGNINCOMBAT = "|cffff0000Impossibile assegnare in combattimento!",
+				PRIORITIZEPASSIVE = "Dai priorità alla rotazione passiva",
+				PRIORITIZEPASSIVETT = "Abilitato: Rotazione, Rotazione Secondaria eseguiranno prima la rotazione passiva, poi la rotazione nativa al clic verso il basso\nDisabilitato: Rotazione, Rotazione Secondaria eseguiranno prima la rotazione nativa al clic verso il basso, poi la rotazione passiva al rilascio",
+				CHECKSELFCAST = "Applicare a se stessi",
+				CHECKSELFCASTTT = "Abilitato: Se il modificatore SELFCAST è tenuto premuto, sui pulsanti di clic sarete voi il bersaglio",
+				UNITTT = "Abilita o disabilita i pulsanti di clic per questa unità in rotazione passiva",
+			},
 		},
 	},
 	esES = {			
@@ -2909,6 +3022,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000Macro ya existe!|r",
 		MACROLIMIT = "|cffff0000No se puede crear la macro, límite alcanzado. Debes borrar al menos una macro!|r",	
 		MACROINCOMBAT = "|cffff0000No se puede crear macro en combate. Necesitas salir del combate!|r",
+		MACROSIZE = "|cffff0000El tamaño de la macro no puede superar los 255 bytes!|r",
 		GLOBALAPI = "API Global: ",
 		RESIZE = "Redimensionar",
 		RESIZE_TOOLTIP = "Click-y-arrastrar para redimensionar",
@@ -2963,6 +3077,7 @@ local Localization = {
 			SAVEMOUSE = "Guardar Lista de Cursor",
 			SAVEMSG = "Guardar Lista de Mensajes",
 			SAVEHE = "Guardar ajustes de Sistema de curacióne",
+			SAVEHOTKEYS = "Guardar configuración de teclas rápidas",
 			LUAWINDOW = "Configurar LUA",
 			LUATOOLTIP = "Para referirse a la unidad de comprobación, usa 'thisunit' sin comillas\nEl código debe tener retorno boolean (true) para procesar las condiciones\nEste código tiene setfenv que significa lo que no necesitas usar Action. para cualquier cosa que tenga it\n\nSi quieres borrar un codigo default necesitas escribir 'return true' sin comillas en vez de removerlo todo",
 			BRACKETMATCH = "Correspondencia de corchetes",
@@ -2983,6 +3098,7 @@ local Localization = {
 			LANGUAGE = "[Español]",
 			AUTO = "Auto",
 			SESSION = "Sesión: ",
+			PREVIEWBYTES = "Vista previa: %s bytes (límite máximo 255, 210 recomendados)",
 			[1] = {
 				HEADBUTTON = "General",	
 				HEADTITLE = "Primaria",
@@ -3109,6 +3225,9 @@ local Localization = {
 				KEY = "[Tecla: ",
 				KEYTOTAL = "[Cola Total: ",
 				KEYTOOLTIP = "Usa esta tecla en la pestaña 'Mensajes'",
+				MACRO = "Macro",
+				MACROTOOLTIP = "Debe ser lo más corto posible, el macro está limitado a 255 bytes\naproximadamente 45 bytes deben reservarse para multi-cadena, se soporta multilínea\n\nSi se omite el Macro, se usará la construcción autounit por defecto:\n\"/cast [@unitID]spellName\" o \"/cast [@unitID]spellName(Rank %d)\" o \"/use item:itemID\"\n\nEl Macro siempre debe añadirse a acciones que tengan algo como\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\n\nAcepta patrones:\n\"spell:12345\" se reemplazará por spellName obtenido de los números\n\"thisID\" se reemplazará por self.SlotID o self.ID\n\"(Rank %d+)\" reemplazará Rank por la palabra localizada\nCualquier patrón puede combinarse, por ejemplo \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "está prohibido cambiar la macro!",
 				ISFORBIDDENFORBLOCK = "está prohibido ponerlo en bloquear!",
 				ISFORBIDDENFORQUEUE = "está prohibido ponerlo en cola!",
 				ISQUEUEDALREADY = "ya existe en la cola!",
@@ -3445,6 +3564,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Efectividad de conservación de maná",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "¡Solo afecta la configuración de las habilidades de curación 'AUTO'!\n\nEste es un multiplicador en el que se calculará la curación pura cuando se inició la fase de guardado de maná\n\nCuanto mayor sea el nivel, mayor será el ahorro de maná, pero menos APM\n\nBotón derecho: Crear macro",			
 			},					
+			[9] = {
+				HEADBUTTON = "Teclas rápidas",
+				FRAMEWORK = "[Cada especialización] Marco",
+				HOTKEYINSTRUCTION = "Presione o haga clic en cualquier tecla rápida o botón del ratón para asignar",
+				META = "Meta",
+				METAENGINEROWTT = "Doble clic izquierdo para asignar la tecla rápida\nDoble clic derecho para desasignar la tecla rápida",
+				ACTION = "Acción",
+				HOTKEY = "Tecla rápida",
+				HOTKEYASSIGN = "Crear",
+				HOTKEYUNASSIGN = "Desvincular",
+				ASSIGNINCOMBAT = "|cffff0000¡No se puede asignar en combate!",
+				PRIORITIZEPASSIVE = "Priorizar rotación pasiva",
+				PRIORITIZEPASSIVETT = "Activado: Rotación, Rotación Secundaria harán primero la rotación pasiva, luego la rotación nativa al hacer clic al presionar\nDesactivado: Rotación, Rotación Secundaria harán primero la rotación nativa al hacer clic al presionar, luego la rotación pasiva al soltar",
+				CHECKSELFCAST = "Aplicar a uno mismo",
+				CHECKSELFCASTTT = "Activado: Si se mantiene el modificador SELFCAST, en los botones de clic usted será el objetivo",
+				UNITTT = "Activa o desactiva los botones de clic para esta unidad en rotación pasiva",
+			},
 		},
 	},
 	ptPT = {		
@@ -3462,6 +3598,7 @@ local Localization = {
 		MACROEXISTED = "|cffff0000Macro já existe!|r",
 		MACROLIMIT = "|cffff0000Impossível criar macro. Você já chegou no limite. Você precisa remover pelo menos um macro!|r",	
 		MACROINCOMBAT = "|cffff0000Impossível criar macro em combate. Você precisa sair de combate!|r",
+		MACROSIZE = "|cffff0000O tamanho da macro não pode exceder 255 bytes!|r",
 		GLOBALAPI = "API Global: ",
 		RESIZE = "Redimensionar",
 		RESIZE_TOOLTIP = "Clique-e-arraste to redimensionar",
@@ -3516,6 +3653,7 @@ local Localization = {
 			SAVEMOUSE = "Salvar lista de Cursors",
 			SAVEMSG = "Salvar lista de MSG",
 			SAVEHE = "Salvar configurações das Sistema de Cura",
+			SAVEHOTKEYS = "Salvar configurações de atalhos",
 			LUAWINDOW = "Configurar LUA",
 			LUATOOLTIP = "Para se referir a unidade checada, use 'thisunit' sem aspas\nCódigo deve retornar um Boolean (true) para processar as condições\nEste código tem setfenv o que significa que você não precisa usar o Action para nada que já tenha ele\n\nSe quiser remover o código padrão você precisará escrever 'return true' sem aspas no lugar de remover tudo",
 			BRACKETMATCH = "Igualar colchetes",
@@ -3662,6 +3800,9 @@ local Localization = {
 				KEY = "[Key: ",
 				KEYTOTAL = "[Total enfileirado: ",
 				KEYTOOLTIP = "Use esta chave na aba 'Mensagens'",
+				MACRO = "Macro",
+				MACROTOOLTIP = "Deve ser o mais curto possível, o macro é limitado a 255 bytes\ncerca de 45 bytes devem ser reservados para múltipla cadeia, multilinha é suportado\n\nSe o Macro for omitido, será usada a construção autounit padrão:\n\"/cast [@unitID]spellName\" ou \"/cast [@unitID]spellName(Rank %d)\" ou \"/use item:itemID\"\n\nO Macro sempre deve ser adicionado a ações que tenham algo como\n/cast [@player]spell:thisID\n/castsequence reset=1 spell:thisID, nil\n\nAceita padrões:\n\"spell:12345\" será substituído por spellName obtido a partir dos números\n\"thisID\" será substituído por self.SlotID ou self.ID\n\"(Rank %d+)\" substituirá Rank pela palavra localizada\nQualquer padrão pode ser combinado, por exemplo \"spell:thisID(Rank 1)\"",
+				ISFORBIDDENFORMACRO = "é proibido alterar macro!",
 				ISFORBIDDENFORBLOCK = "é proibido para o bloqueado!",
 				ISFORBIDDENFORQUEUE = "é proibido para a fila!",
 				ISQUEUEDALREADY = "já existe na fila!",
@@ -3998,6 +4139,23 @@ local Localization = {
 				MANAMANAGEMENTPREDICTVARIATION = "Eficácia da Conservação de Mana",
 				MANAMANAGEMENTPREDICTVARIATIONTOOLTIP = "Afeta apenas as configurações das habilidades de cura 'AUTO'!\n\nEste é um multiplicador no qual a cura pura será calculada quando a fase de economia de mana foi iniciada\n\nQuanto maior o nível, mais economia de mana, mas menos APM\n\nClique direito: Criar macro",	
 			},			
+			[9] = {
+				HEADBUTTON = "Atalhos",
+				FRAMEWORK = "[Cada especialização] Estrutura",
+				HOTKEYINSTRUCTION = "Pressione ou clique em qualquer tecla de atalho ou botão do mouse para atribuir",
+				META = "Meta",
+				METAENGINEROWTT = "Duplo clique esquerdo para atribuir o atalho\nDuplo clique direito para desatribuir o atalho",
+				ACTION = "Ação",
+				HOTKEY = "Atalho",
+				HOTKEYASSIGN = "Criar",
+				HOTKEYUNASSIGN = "Desvincular",
+				ASSIGNINCOMBAT = "|cffff0000Não é possível atribuir em combate!",
+				PRIORITIZEPASSIVE = "Priorizar rotação passiva",
+				PRIORITIZEPASSIVETT = "Ativado: Rotação, Rotação Secundária farão primeiro a rotação passiva, depois a rotação nativa ao clicar\nDesativado: Rotação, Rotação Secundária farão primeiro a rotação nativa ao clicar, depois a rotação passiva ao soltar",
+				CHECKSELFCAST = "Aplicar em si mesmo",
+				CHECKSELFCASTTT = "Ativado: Se o modificador SELFCAST for mantido, nos botões de clique você será o alvo",
+				UNITTT = "Ativa ou desativa os botões de clique para esta unidade na rotação passiva",
+			},
 		},
 	},
 }
@@ -4313,6 +4471,7 @@ local Factory = {
 		disabledActions = {},
 		luaActions = {},
 		QluaActions = {},
+		macroActions = {},
 	},
 	[4] = {
 		-- Category
@@ -4488,11 +4647,12 @@ local Factory = {
 			[6] = true, 	-- Absorb Negative				
 		},
 		SelectStopOptions = {
-			[1] = true,  -- @mouseover friendly 
-			[2] = true,  -- @mouseover enemy 
-			[3] = true,  -- @target enemy 
-			[4] = true,  -- @target boss 
-			[5] = true,  -- @player dead 
+			-- Classic: true, otherwise false means /focus healing
+			[1] = Action.BuildToC < 20000,  -- @mouseover friendly 
+			[2] = Action.BuildToC < 20000,  -- @mouseover enemy 
+			[3] = Action.BuildToC < 20000,  -- @target enemy 
+			[4] = Action.BuildToC < 20000,  -- @target boss 
+			[5] = Action.BuildToC < 20000,  -- @player dead 
 			[6]	= false, -- sync-up "Rotation doesn't work if"
 		},
 		SelectSortMethod = "HP",	
@@ -4546,6 +4706,29 @@ local Factory = {
 		ManaManagementStopAtHP = 40,
 		ManaManagementStopAtTTD = 6,
 		ManaManagementPredictVariation = 4,
+	},
+	[9] = {
+		PLAYERSPEC = {
+			Framework = "MetaEngine",
+			MetaEngine = {
+				Hotkeys = {
+					[1] 							= { meta = 1,  action = "AntiFake CC", 					hotkey = "" },
+					[2] 							= { meta = 2,  action = "AntiFake Interrupt", 			hotkey = "" },
+					[3] 							= { meta = 3,  action = "Rotation", 					hotkey = "" },
+					[4]								= { meta = 4,  action = "Secondary Rotation", 			hotkey = "" },
+					[5] 							= { meta = 5,  action = "Trinket Rotation", 			hotkey = "" },
+					[7] 							= { meta = 7,  action = "AntiFake CC Focus", 			hotkey = "" },
+					[8] 							= { meta = 8,  action = "AntiFake Interrupt Focus", 	hotkey = "" },
+					[9] 							= { meta = 9,  action = "AntiFake CC Focus2", 			hotkey = "" },
+					[10] 							= { meta = 10, action = "AntiFake Interrupt Focus2", 	hotkey = "" },
+				},
+				PrioritizePassive = true,
+				checkselfcast = false,
+				raid = true,
+				party = true,
+				arena = true,
+			},
+		},
 	},
 }; StdUi.Factory = Factory
 
@@ -5826,7 +6009,7 @@ end
 function Action:GetTableKeyIdentify()
 	-- Using to link key in DB
 	if not self.TableKeyIdentify then 
-		self.TableKeyIdentify = strOnlyBuilder(self.SubType, self.ID, self.isRank, self.Desc, self.Color)
+		self.TableKeyIdentify = strOnlyBuilder(self.SubType, self.ID, self.isRank, self.Desc, self.Color, self.Macro)
 	end 
 	return self.TableKeyIdentify
 end
@@ -6924,6 +7107,615 @@ end
 function Action:RunQLua(thisunit)
 	return RunLua(self:GetQLUA(), thisunit)
 end
+
+-------------------------------------------------------------------------------
+-- UI: Macro - Container
+-------------------------------------------------------------------------------
+local MacroAPI; MacroAPI = {
+	spellgsub = function(s)
+		local spellID = Action.toNum[s]
+		local spellName = A_GetSpellInfo(spellID)
+		return spellName or ""
+	end,
+	rank_localizations = {
+		enUS = "Rank",
+		ruRU = "Уровень",
+		-- Unconfirmed:
+		deDE = "Stufe",
+		frFR = "Niveau",
+		esES = "Rango",
+		itIT = "Grado",
+		ptBR = "Classe",
+		koKR = "등급",
+		zhCN = "等级",
+		zhTW = "等級",
+	},
+	rankgsub = function(lvl)
+		return strformat("(%s %s)", MacroAPI.rank_localizations[GameLocale] or MacroAPI.rank_localizations.enUS, lvl)
+	end,
+	Format = setmetatable({ 
+			[""] = "",
+		}, {
+		__call = function(t, action, macro)
+			if t[macro] then 
+				return t[macro]
+			end 
+			
+			-- thisID → action.SlotID or action.ID
+			macro = macro:gsub("thisID", toStr(action.SlotID or action.ID))
+			
+			-- spell:%d+ → A_GetSpellInfo(%d+)
+			macro = macro:gsub("spell:(%d+)", MacroAPI.spellgsub)
+			
+			-- (Rank %d+) → game client localized word
+			macro = macro:gsub("%(Rank (%d+)%)", MacroAPI.rankgsub)
+
+			t[macro] = macro		
+			return macro
+		end,
+	}),	
+	WipeFormat = function()
+		-- This function used to update spellName in macros on talent and specialization change to avoid cache issues
+		if InCombatLockdown() then
+			MacroAPI.IsPendingWipeFormat = true
+			return
+		end
+		
+		wipe(MacroAPI.Format)
+		MacroAPI.Format[""] = ""		
+	end,
+	WipeDefaultMacros = function()
+		-- This function used to update [@mouseover] macro construction on GetToggle(2, "mouseover") change
+		if InCombatLockdown() then
+			MacroAPI.IsPendingWipeDefaultMacros = true
+			return
+		end
+		
+		MacroAPI.WipeFormat()
+		local owner = isClassic and Action.PlayerClass or Action.PlayerSpec
+		for k, v in pairs(Action[owner]) do
+			if type(v) == "table" and v.Macro == "" then
+				v:SetDefaultMacro()
+			end
+		end
+		
+		TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
+	end,
+	PLAYER_REGEN_ENABLED = function()
+		if MacroAPI.IsPendingWipeDefaultMacros then
+			MacroAPI.WipeDefaultMacros() -- MacroAPI.WipeFormat() -> MacroAPI.WipeDefaultMacros()	
+		elseif MacroAPI.IsPendingWipeFormat then
+			MacroAPI.WipeFormat()
+		end
+		MacroAPI.IsPendingWipeDefaultMacros = nil
+		MacroAPI.IsPendingWipeFormat = nil
+	end,
+	Reset = function(self)
+		A_Listener:Remove("ACTION_EVENT_MACROAPI", "PLAYER_REGEN_ENABLED")
+		A_Listener:Remove("ACTION_EVENT_MACROAPI", "PLAYER_TALENT_UPDATE")
+		A_Listener:Remove("ACTION_EVENT_MACROAPI", "ACTIVE_TALENT_GROUP_CHANGED")
+		TMW:UnregisterCallback("TMW_ACTION_PLAYER_SPECIALIZATION_CHANGED")	
+		self.IsPendingWipeDefaultMacros = nil
+		self.IsPendingWipeFormat = nil
+	end,
+	Initialize = function(self)
+		A_Listener:Add("ACTION_EVENT_MACROAPI", "PLAYER_REGEN_ENABLED", self.PLAYER_REGEN_ENABLED)
+		A_Listener:Add("ACTION_EVENT_MACROAPI", "PLAYER_TALENT_UPDATE", self.WipeFormat)
+		A_Listener:Add("ACTION_EVENT_MACROAPI", "ACTIVE_TALENT_GROUP_CHANGED", self.WipeFormat)
+		TMW:RegisterCallback("TMW_ACTION_PLAYER_SPECIALIZATION_CHANGED", self.WipeFormat)	
+	end,	
+}
+
+-- Doesn't need OnProfileChanged because we only wipe macros on changed spells to get correct name
+-- Macro body obtained through self action and should not conflict with actions from previous profile
+function StdUi:CreateMacroEditor(parent, title, w, h, editTT)
+	-- @return frame
+	local MacroWindow = self:Window(parent, w, h, title)
+	MacroWindow:SetShown(false)
+	MacroWindow:SetFrameStrata("DIALOG")
+	MacroWindow:SetMovable(false)
+	MacroWindow:EnableMouse(false)
+	self:GlueBefore(MacroWindow, Action.MainUI, 0, 0)	
+	
+	MacroWindow.UseBracketMatch = self:Checkbox(MacroWindow, L["TAB"]["BRACKETMATCH"])
+	self:GlueTop(MacroWindow.UseBracketMatch, MacroWindow, 15, -15, "LEFT")	
+		
+	MacroWindow.LineNumber = self:Subtitle(MacroWindow, "")
+	MacroWindow.LineNumber:SetFontSize(14)
+	self:GlueTop(MacroWindow.LineNumber, MacroWindow, 0, -30)
+	
+	local widget = self:MultiLineBox(MacroWindow, 100, 5, "") 
+	widget.editBox.stdUi = self
+	widget.scrollFrame.stdUi = self
+	MacroWindow.EditBox = widget.editBox
+	MacroWindow.EditBox:SetText("")
+	MacroWindow.EditBox.panel:SetBackdropColor(0, 0, 0, 1)
+	self:GlueAcross(MacroWindow.EditBox.panel, MacroWindow, 5, -50, -5, (h-50)/2+35)	
+	
+	local preview = self:MultiLineBox(MacroWindow, 100, 5, "") 
+	preview.editBox.stdUi = self
+	preview.scrollFrame.stdUi = self
+	MacroWindow.Preview = preview.editBox
+	MacroWindow.Preview:SetText("")
+	MacroWindow.Preview:Disable()
+	MacroWindow.Preview.panel:SetBackdropColor(0, 0, 0, 1)
+	self:GlueAcross(MacroWindow.Preview.panel, MacroWindow, 5, -50-MacroWindow.EditBox.panel:GetHeight()-30, -5, 5)
+	MacroWindow.Preview.Subtitle = self:Subtitle(MacroWindow, strformat(L["TAB"]["PREVIEWBYTES"], 0))
+	MacroWindow.Preview.Subtitle:SetFontSize(14)
+	MacroWindow.Preview.SkipNextTimer = 0
+	self:GlueAbove(MacroWindow.Preview.Subtitle, MacroWindow.Preview, 0, 5, "TOP")
+	
+	if editTT then 
+		self:FrameTooltip(MacroWindow.EditBox, editTT, nil, "TOPRIGHT", "TOPRIGHT")
+	end 	
+	
+	-- The indention lib overrides GetText, but for the line number
+	-- display we need the original, so save it here
+	MacroWindow.EditBox.GetOriginalText = MacroWindow.EditBox.GetText
+	-- ForAllIndentsAndPurposes
+	local IndentationLib = _G.IndentationLib
+	if IndentationLib then
+		-- Monkai   
+		local theme = {		
+			["Table"] = "|c00ffffff",
+			["Arithmetic"] = "|c00f92672",
+			["Relational"] = "|c00ff3333",
+			["Logical"] = "|c00f92672",
+			["Special"] = "|c0066d9ef",
+			["Keyword"] =  "|c00f92672",
+			["Comment"] = "|c0075715e",
+			["Number"] = "|c00ae81ff",
+			["String"] = "|c00e6db74"
+		}
+  
+		local color_scheme = { [0] = "|r" }
+		color_scheme[IndentationLib.tokens.TOKEN_SPECIAL] = theme["Special"]
+		color_scheme[IndentationLib.tokens.TOKEN_KEYWORD] = theme["Keyword"]
+		-- Macros haven't comments
+		--color_scheme[IndentationLib.tokens.TOKEN_COMMENT_SHORT] = theme["Comment"]
+		--color_scheme[IndentationLib.tokens.TOKEN_COMMENT_LONG] = theme["Comment"]
+		color_scheme[IndentationLib.tokens.TOKEN_NUMBER] = theme["Number"]
+		color_scheme[IndentationLib.tokens.TOKEN_STRING] = theme["String"]
+
+		color_scheme["..."] = theme["Table"]
+		color_scheme["{"] = theme["Table"]
+		color_scheme["}"] = theme["Table"]
+		color_scheme["["] = theme["Table"]
+		color_scheme["]"] = theme["Table"]
+
+		color_scheme["+"] = theme["Arithmetic"]
+		color_scheme["-"] = theme["Arithmetic"]
+		color_scheme["/"] = theme["Arithmetic"]
+		color_scheme["*"] = theme["Arithmetic"]
+		color_scheme[".."] = theme["Arithmetic"]
+
+		color_scheme["=="] = theme["Relational"]
+		color_scheme["<"] = theme["Relational"]
+		color_scheme["<="] = theme["Relational"]
+		color_scheme[">"] = theme["Relational"]
+		color_scheme[">="] = theme["Relational"]
+		color_scheme["~="] = theme["Relational"]
+
+		color_scheme["and"] = theme["Logical"]
+		color_scheme["or"] = theme["Logical"]
+		color_scheme["not"] = theme["Logical"]
+		
+		IndentationLib.enable(MacroWindow.EditBox, color_scheme, 4)		
+	end 
+	
+	-- Bracket Matching and schedule Preview
+	local pattern1 = "[ \t]*(.-)[ \t]*\r?\n" -- DON'T USE %s instead of white space, left and right trims each line
+	local pattern2 = "\n*(.*[^\n])\n*" -- removes empty new lines before and after text
+	function MacroWindow.Preview.SetFormattedMacro()
+		local cleanMacro = strOnlyBuilder(MacroWindow.EditBox:GetText(), "\n"):gsub(pattern1, "%1\n"):gsub(pattern2, "%1")
+		MacroWindow.Preview:SetText(MacroAPI.Format(MacroWindow.action, cleanMacro))
+		MacroWindow.Preview.Subtitle:SetText(strformat(L["TAB"]["PREVIEWBYTES"], #cleanMacro))
+	end
+	
+	MacroWindow.EditBox:SetScript("OnChar", function(self, char)		
+		if not IsControlKeyDown() and MacroWindow.UseBracketMatch:GetChecked() then 
+			if char == "(" then
+				MacroWindow.EditBox:Insert(")")
+				MacroWindow.EditBox:SetCursorPosition(MacroWindow.EditBox:GetCursorPosition() - 1)
+			elseif char == "{" then
+				MacroWindow.EditBox:Insert("}")
+				MacroWindow.EditBox:SetCursorPosition(MacroWindow.EditBox:GetCursorPosition() - 1)
+			elseif char == "[" then
+				MacroWindow.EditBox:Insert("]")
+				MacroWindow.EditBox:SetCursorPosition(MacroWindow.EditBox:GetCursorPosition() - 1)
+			end	
+		end 
+		
+		if TMW.time > MacroWindow.Preview.SkipNextTimer then
+			MacroWindow.Preview:SetText("")
+			MacroWindow.Preview.Subtitle:SetText(strformat(L["TAB"]["PREVIEWBYTES"], 0))
+			Action.TimerSetRefreshAble("MacroWindow.Preview", 1.5, MacroWindow.Preview.SetFormattedMacro)
+		end		
+	end)
+
+	-- Update Line Number and Text Size
+	MacroWindow.EditBox:HookScript("OnCursorChanged", function() 
+		local cursorPosition = MacroWindow.EditBox:GetCursorPosition()
+		local next = -1
+		local line = 0
+		while (next and cursorPosition >= next) do
+			next = MacroWindow.EditBox.GetOriginalText(MacroWindow.EditBox):find("[\n]", next + 1)
+			line = line + 1
+		end
+		MacroWindow.LineNumber:SetText(line)		
+	end)	
+	
+	-- Set manual black color (if enabled custom Color Picker)
+	MacroWindow.EditBox:HookScript("OnShow", function(self)
+		if A_GetToggle(1, "ColorPickerUse") then 
+			self.panel:SetBackdropColor(0, 0, 0, 1)
+		end 
+	end)
+	MacroWindow.Preview:HookScript("OnShow", function(self)
+		if A_GetToggle(1, "ColorPickerUse") then 
+			self.panel:SetBackdropColor(0, 0, 0, 1)
+		end 
+	end)	
+	
+	-- Close handlers 		
+	MacroWindow.closeBtn:SetScript("OnClick", function(self) 
+		local newUnformattedMacro = strOnlyBuilder(MacroWindow.EditBox:GetText(), "\n"):gsub(pattern1, "%1\n"):gsub(pattern2, "%1")
+		local _, oldUnformattedMacro = MacroWindow.action:GetMacro()
+		
+		if newUnformattedMacro ~= oldUnformattedMacro and (oldUnformattedMacro ~= "" or #newUnformattedMacro > 3) then 
+			-- Check user mistakes with quotes on thisID 
+			if newUnformattedMacro:find("'thisID'") or newUnformattedMacro:find('"thisID"') then 				
+				error("thisID must be without quotes!")
+				return
+			end 
+			
+			-- Check user mistakes with quotes on spell 
+			if newUnformattedMacro:find("'spell'") or newUnformattedMacro:find('"spell"') then 				
+				error("spell must be without quotes!")
+				return
+			end	
+			
+			if MacroWindow.action:CanSetMacro(newUnformattedMacro) then
+				MacroWindow.action:SetUserMacro(newUnformattedMacro)
+				Action.TimerDestroy("MacroWindow.Preview")
+				if #newUnformattedMacro <= 3 then
+					MacroWindow.Preview.SkipNextTimer = TMW.time + 2
+					MacroWindow.EditBox:SetText(MacroWindow.action.Macro or "")
+					MacroWindow.Preview.SetFormattedMacro()
+					Action.TimerDestroy("MacroWindow.Preview")
+				end
+			else
+				return -- prevents hide window, for example await out of combat to finish save
+			end			
+		end
+		self:GetParent():Hide()		
+	end)
+	
+	MacroWindow:SetScript("OnHide", function(self)
+		self.closeBtn:Click() 
+	end)
+	
+	MacroWindow.EditBox:SetScript("OnEscapePressed", function() 
+		MacroWindow.closeBtn:Click() 
+	end)
+	
+	return MacroWindow
+end 
+
+-- [3] Macro API
+function Action:CanSetMacro(newMacro)
+	if self.MacroForbidden or self.Hidden then 
+		-- A_Print(L["DEBUG"] .. self:Link() .. " " .. L["TAB"][3]["ISFORBIDDENFORMACRO"])
+        return true -- just to allow to hide MacroEditor
+	end
+	
+	if InCombatLockdown() then
+		A_Print(L["MACROINCOMBAT"])
+		return
+	end
+	
+	if #newMacro > 255 then
+		A_Print(L["MACROSIZE"])
+		return	
+	end
+	
+	return true
+end
+
+function Action:SetUserMacro(newMacro)
+	-- Used on UI by user
+	if newMacro == self.Macro or #newMacro <= 3 then
+		-- Reset or removed or empty
+		if not isClassic then 
+			pActionDB[3][Action.PlayerSpec].macroActions[self:GetTableKeyIdentify()] = nil
+		else
+			pActionDB[3].macroActions[self:GetTableKeyIdentify()] = nil
+		end
+	else
+		if not isClassic then 
+			pActionDB[3][Action.PlayerSpec].macroActions[self:GetTableKeyIdentify()] = newMacro
+		else
+			pActionDB[3].macroActions[self:GetTableKeyIdentify()] = newMacro
+		end
+	end
+
+	TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
+	return newMacro
+end
+
+function Action:SetDefaultMacro()
+	-- Used on Create by default or profile
+	-- Objective most of macros from this function can be used for generic meta1-5 setup because meta6-10 have different units
+	local pattern
+	
+	if self.Type == "Spell" then
+		pattern = "/cast spell:"
+		
+		if self:HasRange() then
+			local hasfocus = BuildToC >= 20000 
+			local togglemouseover = A_GetToggle(2, "mouseover")
+			local togglefocus = A_GetToggle(2, "focus")
+			local togglefocustarget = A_GetToggle(2, "focustarget")
+			local toggletargettarget = A_GetToggle(2, "targettarget")
+			if not hasfocus then
+				togglefocus, togglefocustarget = false, false
+			end
+			if not Action.IamHealer then
+				toggletargettarget, togglefocustarget = false, false
+			end
+	
+			local isHelp = self:IsHelpful()
+			local isHarm = self:IsHarmful()
+			if isHelp and isHarm then
+			  --[@mouseover,exists][@focus,help][@target,help][@target,harm][@focustarget,harm][@targettarget,harm][@player]
+				local firstCDNT = not (togglefocustarget == false and toggletargettarget == false)
+				local lastCNDT = not (togglemouseover == false and togglefocus == false and togglefocustarget == false and toggletargettarget == false)
+				pattern = strOnlyBuilder(
+					"/cast ", 	togglemouseover == false and 								"" or "[@mouseover,exists]", 
+								togglefocus == false and 									"" or "[@focus,help]",
+								not firstCDNT and 											"" or "[help][harm]",
+								togglefocustarget == false and 								"" or "[@focustarget,harm]",
+								toggletargettarget == false and 							"" or "[@targettarget,harm]",
+								not lastCNDT and 											"" or "[]",											
+																								  "spell:"
+				)
+			elseif isHelp then
+			  --[@mouseover,help][@focus,help][@target,help][@player]
+				local lastCNDT = not (togglemouseover == false and togglefocus == false)
+				pattern = strOnlyBuilder(
+					"/cast ", 	togglemouseover == false and 								"" or "[@mouseover,help]", 
+								togglefocus == false and 									"" or "[@focus,help]",
+								not lastCNDT and 											"" or "[]",									
+																								  "spell:"
+				)
+			else
+			  --[@mouseover,harm][@target,harm][@focustarget,harm][@targettarget,harm]
+				local firstCDNT = not (togglefocustarget == false and toggletargettarget == false)
+				local lastCNDT = not (togglemouseover == false and togglefocustarget == false and toggletargettarget == false)
+				pattern = strOnlyBuilder(
+					"/cast ", 	togglemouseover == false and 								"" or "[@mouseover,harm]", 
+								not firstCDNT and 											"" or "[harm]",
+								togglefocustarget == false and 								"" or "[@focustarget,harm]",
+								toggletargettarget == false and 							"" or "[@targettarget,harm]",
+								not lastCNDT and 											"" or "[]",											
+																								  "spell:"
+				)
+			end
+		end
+	end
+	
+	if (self.Type == "Item" and self.SubType ~= "ItemBySlot") or (self.Type == "Trinket" and self.SubType ~= "TrinketBySlot") then
+		pattern = "/use item:"
+		
+		if self:HasRange() then
+			local hasfocus = BuildToC >= 20000 
+			local togglemouseover = A_GetToggle(2, "mouseover")
+			local togglefocus = A_GetToggle(2, "focus")
+			local togglefocustarget = A_GetToggle(2, "focustarget")
+			local toggletargettarget = A_GetToggle(2, "targettarget")
+			if not hasfocus then
+				togglefocus, togglefocustarget = false, false
+			end
+			if not Action.IamHealer then
+				toggletargettarget, togglefocustarget = false, false
+			end
+			
+			local isHelp = self:IsHelpful()
+			local isHarm = self:IsHarmful()
+			if isHelp and isHarm then
+			  --[@mouseover,exists][@focus,help][@target,help][@target,harm][@focustarget,harm][@targettarget,harm][@player]
+				local firstCDNT = not (togglefocustarget == false and toggletargettarget == false)
+				local lastCNDT = not (togglemouseover == false and togglefocus == false and togglefocustarget == false and toggletargettarget == false)
+				pattern = strOnlyBuilder(
+					"/use ", 	togglemouseover == false and 								"" or "[@mouseover,exists]", 
+								togglefocus == false and 									"" or "[@focus,help]",
+								not firstCDNT and 											"" or "[help][harm]",
+								togglefocustarget == false and 								"" or "[@focustarget,harm]",
+								toggletargettarget == false and 							"" or "[@targettarget,harm]",
+								not lastCNDT and 											"" or "[]",											
+																								  "item:"
+				)
+			elseif isHelp then
+			  --[@mouseover,help][@focus,help][@target,help][@player]
+				local lastCNDT = not (togglemouseover == false and togglefocus == false)
+				pattern = strOnlyBuilder(
+					"/use ", 	togglemouseover == false and 								"" or "[@mouseover,help]", 
+								togglefocus == false and 									"" or "[@focus,help]",
+								not lastCNDT and 											"" or "[]",											
+																								  "item:"
+				)
+			else
+			  --[@mouseover,harm][@target,harm][@focustarget,harm][@targettarget,harm]
+				local firstCDNT = not (togglefocustarget == false and toggletargettarget == false)
+				local lastCNDT = not (togglemouseover == false and togglefocustarget == false and toggletargettarget == false)				
+				pattern = strOnlyBuilder(
+					"/use ", 	togglemouseover == false and 								"" or "[@mouseover,harm]", 
+								not firstCDNT and  											"" or "[harm]",
+								togglefocustarget == false and 								"" or "[@focustarget,harm]",
+								toggletargettarget == false and 							"" or "[@targettarget,harm]",
+								not lastCNDT and 											"" or "[]",											
+																								  "item:"
+				)
+			end
+		end
+	end
+	
+	if self.Type == "Potion" then
+		pattern = "/use item:"
+	end
+	
+	if self.SubType == "TrinketBySlot" or self.SubType == "ItemBySlot" then
+		pattern = "/use "
+	end
+		
+	local patternRank = ""
+	if self.Type == "Spell" then
+		if self.isRank then
+			patternRank = Action.strOnlyBuilder("(Rank ", self.isRank, ")")	
+		elseif self.useMinRank then		
+			local rangeRank
+			if type(self.useMaxRank) == "table" then
+				rangeRank = math_min(unpack(self.useMaxRank))
+			end
+			patternRank = Action.strOnlyBuilder("(Rank ", rangeRank or 1, ")")
+		elseif self.useMaxRank then
+			local rangeRank
+			if type(self.useMaxRank) == "table" then
+				rangeRank = math_max(unpack(self.useMaxRank))
+			end
+			patternRank = Action.strOnlyBuilder(rangeRank or "")
+		end
+	end
+	
+	assert(pattern, "Action:SetDefaultMacro can't recognize pattern is 'nil' for ID " .. (self.SlotID or self.ID))
+	self.Macro = Action.strOnlyBuilder(
+		pattern,
+		self.SlotID or self.ID,					
+		patternRank
+	)
+	
+	return self.Macro
+end
+
+function Action:GetMacro()
+	-- @return @string formattedMacro, @string unformattedMacro, @boolean isUserMacro
+	-- Priority if not forbidden
+	-- 	User's macros → Profile macros → Default macros
+	-- otherwise
+	--	Profile macros → Default macros
+	if self.Hidden then
+		return "", "", false
+	end
+	
+	if self.MacroForbidden then
+		return MacroAPI.Format(self, self.Macro), self.Macro, false
+	end
+	
+	local userMacro 
+	if not isClassic then
+		userMacro = pActionDB[3][Action.PlayerSpec].macroActions[self:GetTableKeyIdentify()]
+	else
+		userMacro = pActionDB[3].macroActions[self:GetTableKeyIdentify()]
+	end
+	
+	return MacroAPI.Format(self, userMacro or self.Macro), userMacro or self.Macro, userMacro and true
+end
+
+-------------------------------------------------------------------------------
+-- UI: MetaEngine - Container
+-------------------------------------------------------------------------------
+-- Actions
+function Action:SetDefaultAction()
+	-- Used on Create by default or profile	
+	if not self.Hidden and self.Macro == "" and (self.Type == "Spell" or self.Type == "Item" or self.Type == "Potion" or self.Type == "Trinket") then		
+		-- Macro
+		if self.SubType == "TrinketBySlot" then 
+			-- /use 13, /use 14 is shorter than click
+			self:SetDefaultMacro()
+			return
+		end
+		
+		-- Click		
+		local Click = self.Click or {}
+		self.Click = Click
+		Click.type = Click.type or (self.Type == "Spell" and "spell") or "item"
+		Click.typerelease = Click.typerelease or Click.type
+		
+		if Click.type == "spell" then
+			Click.item = Click.item or "nil"
+			if not Click.spell then
+				if self.isRank then
+					local pattern = Action.strOnlyBuilder("spell:", self.ID, "(Rank ", self.isRank, ")")
+					Click.spell = MacroAPI.Format(self, pattern)
+				elseif self.useMinRank then		
+					local rangeRank
+					if type(self.useMaxRank) == "table" then
+						rangeRank = math_min(unpack(self.useMaxRank))
+					end
+					local pattern = Action.strOnlyBuilder("spell:", self.ID, "(Rank ", rangeRank or 1, ")")
+					Click.spell = MacroAPI.Format(self, pattern)
+				elseif self.useMaxRank then
+					local rangeRank
+					if type(self.useMaxRank) == "table" then
+						rangeRank = math_max(unpack(self.useMaxRank))
+					end
+					local pattern = Action.strOnlyBuilder("spell:", self.ID, rangeRank or "")
+					Click.spell = MacroAPI.Format(self, pattern)
+				else
+					Click.spell = self.ID
+				end
+			end
+		elseif Click.type == "item" then
+			Click.item = Click.item or self.ID
+			Click.spell = Click.spell or "nil"
+		end
+
+		if not Click.unit and not Click.autounit then
+			local isHelp = self:IsHelpful()
+			local isHarm = self:IsHarmful()		
+			Click.autounit = (isHelp and isHarm and "both") or (isHelp and "help") or (isHarm and "harm") or "both" -- the last is fallback			
+		end
+		if Click.autounit then
+			Click.unit = "nil" -- fault protection
+		end
+		
+		assert(Click.type ~= "macro" and Click.typerelease ~= "macro", 'Click cannot be "macro" for ID ' .. (self.SlotID or self.ID))
+		assert(not Click.autounit or Click.autounit == "harm" or Click.autounit == "help" or Click.autounit == "both", '"autounit" used with wrong value for ID ' .. (self.SlotID or self.ID))		
+	end	
+	
+	assert(type(self.Macro) == "string", "Macro must be string for ID " .. (self.SlotID or self.ID))
+end
+
+-- Keybindings
+TMW:RegisterSelfDestructingCallback("TMW_ACTION_METAENGINE_AUTH", function()
+	-- There is no event like UPDATE_BINDINGS, so lets do custom, regardless of active engine as this is just UI visuals
+	local function OVERRIDE_UPDATE_BINDINGS(owner, isPriority, key, ...)
+		if isPriority and not owner.ClearAttributes then
+			local Hotkeys
+			if not isClassic then				
+				Hotkeys = pActionDB[9][Action.PlayerSpec].MetaEngine.Hotkeys
+			else
+				Hotkeys = pActionDB[9].MetaEngine.Hotkeys
+			end
+			
+			for slot, v in pairs(Hotkeys) do
+				if key == v.hotkey then
+					v.hotkey = ""
+					TMW:Fire("TMW_ACTION_METAENGINE_REFRESH_UI")
+					return
+				end
+			end
+		end
+	end
+	
+	hooksecurefunc(_G, "SetOverrideBinding", OVERRIDE_UPDATE_BINDINGS)
+	hooksecurefunc(_G, "SetOverrideBindingClick", OVERRIDE_UPDATE_BINDINGS)
+	hooksecurefunc(_G, "SetOverrideBindingItem", OVERRIDE_UPDATE_BINDINGS)
+	hooksecurefunc(_G, "SetOverrideBindingMacro", OVERRIDE_UPDATE_BINDINGS)
+	hooksecurefunc(_G, "SetOverrideBindingSpell", OVERRIDE_UPDATE_BINDINGS)
+
+	return true
+end)
 
 -------------------------------------------------------------------------------
 -- UI: API
@@ -9133,9 +9925,44 @@ local OnToggleHandler		= {
 	},
 	[2]						= {
 		-- Toggles 
-		AoE			= function() 
+		AoE					= function() 
 			TMW:Fire("TMW_ACTION_AOE_CHANGED")
 			TMW:Fire("TMW_ACTION_AOE_MODE_CHANGED") -- Taste's callback 
+		end,
+		mouseover 			= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleMouseover")
+		end,
+		focus	 			= function(db)
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleFocus")
+			if db.focus then				
+				-- Disables all SelectStopOptions
+				local needset
+				local sso = A_GetToggle(8, "SelectStopOptions")				
+				for i = 1, #sso do
+					if sso[i] then
+						sso[i] = false
+						needset = true
+					end
+				end
+				if needset then
+					A_SetToggle({8, "SelectStopOptions"}, sso)
+				end
+			else
+				-- Defaults all SelectStopOptions if no one is enabled
+				local sso = A_GetToggle(8, "SelectStopOptions")				
+				for i = 1, #sso do
+					if sso[i] then
+						return
+					end
+				end
+				A_SetToggle({8, "SelectStopOptions"}, CopyTable(Factory[8].SelectStopOptions or Factory[8].PLAYERSPEC.SelectStopOptions))
+			end
+		end,
+		focustarget 			= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleFocustarget")
+		end,
+		targettarget 			= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleTargettarget")
 		end,
 	},
 	[4]						= {
@@ -9178,6 +10005,27 @@ local OnToggleHandler		= {
 			TMW:Fire("TMW_ACTION_HEALING_ENGINE_UI_PROFILE", "Changed", "") 
 		end,
 	},	
+	[9]						= {
+		MetaEngine			= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_REFRESH_UI")
+		end,
+		-- Below is only working inside of UI checkboxes
+		PrioritizePassive	= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
+		end,
+		checkselfcast		= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleCheckSelfCast")
+		end,
+		raid 				= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleRaid")
+		end,
+		party 				= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleParty")
+		end,
+		arena 				= function()
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", "ScriptToggleArena")
+		end,
+	},
 }; Action.OnToggleHandler = OnToggleHandler
 local function tCustomMerge(db, custom, n, toggle, text, silence, opposite)
 	for k, v in pairs(custom) do
@@ -9438,7 +10286,7 @@ function Action.ToggleMainUI()
 			MainUI.Profiles:SetText(Action.CurrentProfile or "")
 		end 
 	else 
-		Action.MainUI = StdUi:Window(UIParent, 540, 640, "The Action")
+		Action.MainUI = StdUi:Window(UIParent, 540, 650, "The Action")
 		MainUI		  = Action.MainUI		
 		MainUI.titlePanel.label:SetFontSize(20)
 		MainUI.default_w = MainUI:GetWidth()
@@ -9618,7 +10466,7 @@ function Action.ToggleMainUI()
 		StdUi:FrameTooltip(MainUI.ProfileSession, L["PROFILESESSION"]["BUTTON"], nil, "TOP", true)	
 		StdUi:GlueLeft(MainUI.ProfileSession, MainUI.AllReset, -1, 0)
 		
-		MainUI.ResetQuestion = StdUi:Window(MainUI, 350, 270, L["TAB"]["RESETQUESTION"])
+		MainUI.ResetQuestion = StdUi:Window(MainUI, 350, 300, L["TAB"]["RESETQUESTION"])
 		MainUI.ResetQuestion:SetPoint("CENTER")
 		MainUI.ResetQuestion:SetFrameStrata("TOOLTIP")
 		MainUI.ResetQuestion:SetFrameLevel(50)
@@ -9635,6 +10483,7 @@ function Action.ToggleMainUI()
 		MainUI.CheckboxSaveMouse		= StdUi:Checkbox(MainUI.ResetQuestion, L["TAB"]["SAVEMOUSE"], 300)	
 		MainUI.CheckboxSaveMSG 			= StdUi:Checkbox(MainUI.ResetQuestion, L["TAB"]["SAVEMSG"], 300)
 		MainUI.CheckboxSaveHE 			= StdUi:Checkbox(MainUI.ResetQuestion, L["TAB"]["SAVEHE"], 300)
+		MainUI.CheckboxSaveHotkeys		= StdUi:Checkbox(MainUI.ResetQuestion, L["TAB"]["SAVEHOTKEYS"], 300)
 		
 		MainUI.Yes = StdUi:Button(MainUI.ResetQuestion, 150, 35, L["YES"])		
 		StdUi:GlueBottom(MainUI.Yes, MainUI.ResetQuestion, 20, 20, "LEFT")
@@ -9691,6 +10540,12 @@ function Action.ToggleMainUI()
 					ProfileSave[8][k] = v
 				end
 			end 
+			if MainUI.CheckboxSaveHotkeys:GetChecked() then 	
+				ProfileSave[9] = {}
+				for k, v in pairs(pActionDB[9]) do
+					ProfileSave[9][k] = v
+				end
+			end 
 			
 			wipe(gActionDB)
 			wipe(pActionDB)
@@ -9722,6 +10577,7 @@ function Action.ToggleMainUI()
 		StdUi:GlueBelow(MainUI.CheckboxSaveMouse, MainUI.CheckboxSaveDispel, 0, -10, "LEFT")
 		StdUi:GlueBelow(MainUI.CheckboxSaveMSG, MainUI.CheckboxSaveMouse, 0, -10, "LEFT")
 		StdUi:GlueBelow(MainUI.CheckboxSaveHE, MainUI.CheckboxSaveMSG, 0, -10, "LEFT")
+		StdUi:GlueBelow(MainUI.CheckboxSaveHotkeys, MainUI.CheckboxSaveHE, 0, -10, "LEFT")
 		
 		tabFrame = StdUi:TabPanel(MainUI, nil, nil, {
 			{
@@ -9764,8 +10620,13 @@ function Action.ToggleMainUI()
 				title = L["TAB"][8]["HEADBUTTON"],
 				childs = {},
 			},
+			{
+				name = 9,
+				title = L["TAB"][9]["HEADBUTTON"],
+				childs = {},
+			},
 		}); MainUI.tabFrame = tabFrame
-		StdUi:GlueAcross(tabFrame, MainUI, 10, -50, -10, 10)
+		StdUi:GlueAcross(tabFrame, MainUI, 10, -60, -10, 10)
 		tabFrame.container:SetPoint("TOPLEFT", tabFrame.buttonContainer, "BOTTOMLEFT", 0, 0)
 		tabFrame.container:SetPoint("TOPRIGHT", tabFrame.buttonContainer, "BOTTOMRIGHT", 0, 0)	
 		
@@ -11228,9 +12089,8 @@ function Action.ToggleMainUI()
 								if button == "LeftButton" then 
 									specDB[config.DB] = not specDB[config.DB]
 									self:SetChecked(specDB[config.DB])	
-									if config.DB == "AoE" then 
-										TMW:Fire("TMW_ACTION_AOE_CHANGED")
-										TMW:Fire("TMW_ACTION_AOE_MODE_CHANGED") -- Taste's callback 
+									if OnToggleHandler[tabName][config.DB] then 
+										OnToggleHandler[tabName][config.DB](specDB)
 									end 
 									Action.Print((config.L.ANY or config.L[cL]) .. ": ", specDB[config.DB])	
 								elseif button == "RightButton" and config.M then 
@@ -11388,7 +12248,7 @@ function Action.ToggleMainUI()
 			UI_Title:SetText(L["TAB"][tabName]["HEADTITLE"])
 			StdUi:EasyLayout(anchor, { padding = { top = 50 } })	
 			
-			local Scroll, ScrollTable, Key, SetQueue, SetBlocker, LuaButton, LuaEditor, QLuaButton, QLuaEditor, AutoHidden
+			local Scroll, ScrollTable, Key, SetQueue, SetBlocker, MacroButton, MacroEditor, LuaButton, LuaEditor, QLuaButton, QLuaEditor, AutoHidden
 			
 			local AutoHiddenEvents				= {
 				--["ACTIVE_TALENT_GROUP_CHANGED"]	= true, -- Not exist in Classic 
@@ -11429,6 +12289,27 @@ function Action.ToggleMainUI()
 			Scroll 						= setmetatable({
 				OnClickCell 			= function(table, cellFrame, rowFrame, rowData, columnData, rowIndex, button)				
 					if button == "LeftButton" then		
+						if rowData.MacroForbidden or not Action.MetaEngine or not Action.MetaEngine:IsSafe() then
+							MacroButton.FontStringMacro:SetText(themeOFF)
+							MacroEditor.EditBox:Disable()
+							MacroButton:Disable()
+						else
+							local formattedMacro, unformattedMacro, isUserMacro = rowData:GetMacro()
+							MacroEditor.action = rowData
+							MacroEditor.Preview.SkipNextTimer = TMW.time + 2
+							MacroEditor.EditBox:SetText(unformattedMacro)
+							MacroEditor.Preview:SetText(formattedMacro)								
+							MacroEditor.Preview.SetFormattedMacro()							
+							MacroEditor.EditBox:Enable()
+							MacroButton:Enable()
+							Action.TimerDestroy("MacroWindow.Preview")
+							if isUserMacro then
+								MacroButton.FontStringMacro:SetText(themeON)
+							else
+								MacroButton.FontStringMacro:SetText(themeOFF)
+							end
+						end
+						
 						local luaCode = rowData:GetLUA() or ""
 						LuaEditor.EditBox:SetText(luaCode)
 						if luaCode and luaCode ~= "" then 
@@ -11642,7 +12523,15 @@ function Action.ToggleMainUI()
 					end 
 				end  
 			end)
-			hooksecurefunc(ScrollTable, "ClearSelection", function()				
+			hooksecurefunc(ScrollTable, "ClearSelection", function()	
+				if MacroEditor:IsShown() then 
+					MacroEditor.closeBtn:Click()
+					MacroEditor.Preview.SkipNextTimer = TMW.time + 2
+					MacroEditor.EditBox:SetText("")
+					MacroEditor.Preview:SetText("")
+					Action.TimerDestroy("MacroWindow.Preview")						
+				end 
+				
 				LuaEditor.EditBox:SetText("")
 				if LuaEditor:IsShown() then 
 					LuaEditor.closeBtn:Click()
@@ -11845,6 +12734,45 @@ function Action.ToggleMainUI()
 				end 
 			end)
 			
+			-- UI: MacroButton
+			MacroButton 				= StdUi:Button(anchor, 50, themeHeight - 3, L["TAB"][tabName]["MACRO"])
+			MacroButton.FontStringMacro	= StdUi:Subtitle(MacroButton, themeOFF)
+			MacroButton:Disable()
+			MacroButton:SetScript("OnClick", function()	
+				if not MacroEditor:IsShown() then
+					local index = ScrollTable:GetSelection()
+					if not index then 
+						Action.Print(L["TAB"][tabName]["SELECTIONERROR"]) 
+					else 				
+						MacroEditor:Show()
+					end 
+				else
+					MacroEditor.closeBtn:Click()
+				end 
+			end)
+			StdUi:GlueLeft(MacroButton, QLuaButton.FontStringLUA, -5, 0)
+			StdUi:GlueLeft(MacroButton.FontStringMacro, MacroButton, 0, 0)
+			
+			-- UI: MacroEditor
+			MacroEditor					= StdUi:CreateMacroEditor(anchor, L["TAB"][tabName]["MACRO"], MainUI.default_w, MainUI.default_h, L["TAB"][tabName]["MACROTOOLTIP"])
+			MacroEditor:HookScript("OnHide", function(self)
+				local index = ScrollTable:GetSelection()
+				local data = index and ScrollTable:GetRow(index) or nil
+				if data then 
+					if data.MacroForbidden then 
+						A_Print(L["DEBUG"] .. self:Link() .. " " .. L["TAB"][3]["ISFORBIDDENFORMACRO"])
+						MacroButton.FontStringMacro:SetText(themeOFF)						
+					end
+
+					local _, _, isUserMacro = data:GetMacro()
+					if not data.MacroForbidden and isUserMacro then 
+						MacroButton.FontStringMacro:SetText(themeON)
+					else 
+						MacroButton.FontStringMacro:SetText(themeOFF)
+					end 
+				end 
+			end)	
+			
 			-- UI: AutoHidden
 			AutoHiddenToggle() -- Initialize
 			AutoHidden 					= StdUi:Checkbox(anchor, L["TAB"][tabName]["AUTOHIDDEN"])
@@ -11864,7 +12792,7 @@ function Action.ToggleMainUI()
 			StdUi:FrameTooltip(AutoHidden, L["TAB"][tabName]["AUTOHIDDENTOOLTIP"], nil, "TOP", true)				
 
 			anchor:AddRow({ margin = { left = -15, right = -15 } }):AddElement(ScrollTable)
-			anchor:AddRow({ margin = { left = -15, right = 70 } }):AddElement(Key)
+			anchor:AddRow({ margin = { left = -15, right = 140 } }):AddElement(Key)
 			anchor:AddRow({ margin = { top = -15, left = -15, right = -15 } }):AddElement(AutoHidden)
 			anchor:AddRow({ margin = { top = -10, left = -15, right = -15 } }):AddElements(SetBlocker, SetQueue, { column = "even" })
 			anchor:DoLayout()
@@ -15461,6 +16389,441 @@ function Action.ToggleMainUI()
 			end										
 		end 
 		
+		if tabName == 9 then
+			UI_Title:Hide()	
+			StdUi:EasyLayout(anchor)		
+			
+			local columnEven = { column = "even" }		
+			local 	PanelFramework,
+					MetaEnginePanel
+			
+			local function CreatePanel(title, gutter)
+				local panel
+				if title then 
+					panel = StdUi:PanelWithTitle(anchor, StdUi:GetWidthByColumn(anchor, 12, 30), height or 1, title)	
+					panel.titlePanel.label:SetFontSize(15)				
+					StdUi:GlueTop(panel.titlePanel, panel, 0, -5)
+				else 
+					panel = StdUi:Panel(anchor, StdUi:GetWidthByColumn(anchor, 12, 30), height or 1)
+				end 
+				StdUi:EasyLayout(panel, { gutter = gutter, padding = { left = 0, right = 0, bottom = 5 } })
+
+				-- Remap it to make resize able height and ignore for rows which aren't specified for healer 
+				panel.DoLayout = function(self)
+					if self.rows == nil then 
+						return 
+					end 
+					
+					-- Custom update kids of this panel to determine new total height
+					MainUI.UpdateResizeForKids(self:GetChildrenWidgets())
+					
+					local l = self.layout;
+					local width = self:GetWidth() - l.padding.left - l.padding.right;
+
+					local y = -l.padding.top;
+					for i = 1, #self.rows do
+						local row = self.rows[i];
+						y = y - row:DrawRow(width, y);
+					end
+					
+					if title == "Meta Engine" or not self.hasConfiguredHeight then -- means what panel has ScrollTable which need to resize every time 
+						self:SetHeight(-y)						 
+						if title == "Meta Engine" then 
+							self.hasConfiguredHeight = true 
+						end 
+					end
+				end 
+				
+				return panel 
+			end 			
+			local function CreateCheckbox(parent, width, title, tooltip, rootDB, toggleName, useMacro)
+				local checkbox = StdUi:Checkbox(parent, title, width or 150)
+				checkbox:SetChecked(rootDB[toggleName])
+				checkbox:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+				checkbox:SetScript("OnClick", function(self, button, down)
+					if not self.isDisabled then						
+						if button == "LeftButton" then 
+							rootDB[toggleName] = not rootDB[toggleName]	
+							self:SetChecked(rootDB[toggleName])	
+							if OnToggleHandler[tabName][toggleName] then 
+								OnToggleHandler[tabName][toggleName]()
+							end
+							Action.Print(title .. ": ", rootDB[toggleName])			
+						elseif button == "RightButton" and useMacro then 
+							local nameDB = rootDB == specDB.MetaEngine and "MetaEngine" or "v2"
+							Action.CraftMacro(title, [[/run Action.SetToggle({]] .. tabName .. [[, "]] .. nameDB .. [[", "]] .. title .. [[: "}, {]] .. toggleName .. [[ = not Action.GetToggle(]] .. tabName .. [[, "]] .. nameDB .. [[").]] .. toggleName .. [[})]])	
+						end						
+					end 
+				end)					 
+				checkbox.Identify = { Type = "Checkbox", Toggle = toggleName }	
+				if tooltip then 
+					StdUi:FrameTooltip(checkbox, tooltip, nil, "TOP", true)
+				end 
+				return checkbox			
+			end 
+			
+			-- UI: PanelFramework
+			PanelFramework = CreatePanel(L["TAB"][tabName]["FRAMEWORK"])	
+			
+			-- UI: PanelFramework - Category
+			PanelFramework.Category = StdUi:Dropdown(anchor, StdUi:GetWidthByColumn(PanelFramework, 12), themeHeight, {
+				{ text = "v1", value = "v1" },
+				{ text = "Meta Engine", value = "MetaEngine" },
+			--	{ text = "v2", value = "v2" },				
+			}, specDB.Framework)	
+			PanelFramework.Category:SetScript("OnClick", function(self, button)
+				if InCombatLockdown() then
+					if self.optsFrame:IsVisible() then 
+						self:ToggleOptions()
+					end 
+				else
+					self:ToggleOptions()
+				end
+			end)
+			PanelFramework.Category.OnValueChanged = function(self, value)
+				specDB.Framework = value
+				MetaEnginePanel:SetShown(value == "MetaEngine")
+				if value == "MetaEngine" then
+					MetaEnginePanel.ScrollTable.MakeUpdate()
+				end
+				TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
+			end
+			PanelFramework.Category.text:SetJustifyH("CENTER")				
+			
+			------------------------------------- 
+			-- MetaEngine
+			--	
+			local function UpdateMetaEngineCheckboxes()
+				local rootDB = specDB.MetaEngine
+				for childName, childFrame in pairs(MetaEnginePanel) do
+					if type(childFrame) == "table" and childFrame.Identify and childFrame.Identify.Type == "Checkbox" and childFrame:GetChecked() ~= rootDB[childFrame.Identify.Toggle] then
+						childFrame:SetChecked(rootDB[childFrame.Identify.Toggle], true)
+						OnToggleHandler[tabName][childFrame.Identify.Toggle]()
+					end
+				end					
+			end 
+			local function DrawMetaEngine()				
+				if Action.MetaEngine and Action.MetaEngine:IsSafe() then
+					-- Add MetaEngine					
+					for i = 1, #PanelFramework.Category.options do
+						if PanelFramework.Category.options[i].value == "MetaEngine" then
+							MetaEnginePanel:SetShown(specDB.Framework == "MetaEngine")
+							if specDB.Framework == "MetaEngine" then
+								MetaEnginePanel.ScrollTable.MakeUpdate()
+								UpdateMetaEngineCheckboxes()
+							end
+							return
+						end
+					end
+					
+					PanelFramework.Category.options[#PanelFramework.Category.options + 1] = { text = "Meta Engine", value = "MetaEngine" }
+					PanelFramework.Category:SetOptions(PanelFramework.Category.options)
+					PanelFramework.Category:SetValue(specDB.Framework)
+					MetaEnginePanel.ScrollTable.MakeUpdate()
+					UpdateMetaEngineCheckboxes()
+				else 
+					-- Remove MetaEngine
+					for i = 1, #PanelFramework.Category.options do
+						if PanelFramework.Category.options[i].value == "MetaEngine" then
+							tremove(PanelFramework.Category.options, i)
+							PanelFramework.Category:SetOptions(PanelFramework.Category.options)
+							PanelFramework.Category:SetValue(specDB.Framework ~= "MetaEngine" and specDB.Framework or PanelFramework.Category.options[#PanelFramework.Category.options].value)					
+						end
+					end				
+				end			
+			end
+			local function SetBindMetaEngine(bind)
+				if InCombatLockdown() then
+					A_Print(L["TAB"][tabName]["ASSIGNINCOMBAT"])
+					return
+				end
+				
+				local index = MetaEnginePanel.ScrollTable:GetSelection()
+				local rowData = index and MetaEnginePanel.ScrollTable:GetRow(index) or nil					
+				if rowData and bind ~= MetaEnginePanel.KeybindWindow.bindOld then
+					-- Find and remove bind if assigned on something else
+					for _, v in pairs(specDB.MetaEngine.Hotkeys) do
+						if v.hotkey == bind then
+							v.hotkey = ""
+						end
+					end
+				
+					rowData.Hotkey = bind
+					specDB.MetaEngine.Hotkeys[rowData.Slot].hotkey = bind
+					
+					MetaEnginePanel.ScrollTable:Refresh()				
+					TMW:Fire("TMW_ACTION_METAENGINE_REASSIGN", rowData.Slot, bind)
+				end
+			end
+			
+			-- UI: MetaEngine
+			MetaEnginePanel = CreatePanel("Meta Engine")
+			
+			-- UI: MetaEngine - ScrollTable
+			MetaEnginePanel.OnClickCell = function(table, cellFrame, rowFrame, rowData, columnData, rowIndex, button)	
+				table:SetSelection(rowIndex)
+				MetaEnginePanel.KeybindWindow.bindOld = rowData.Hotkey
+				MetaEnginePanel.KeybindWindow.bind = rowData.Hotkey
+				MetaEnginePanel.KeybindWindow:SetWindowTitle(rowData.Action)
+				MetaEnginePanel.KeybindWindow.messageLabel:SetText(rowData.Hotkey ~= "" and GetBindingText(rowData.Hotkey) or L["TAB"][tabName]["HOTKEYINSTRUCTION"])
+				
+				return true -- prevents deselect row
+			end
+			MetaEnginePanel.OnDoubleClickCell = function(table, cellFrame, rowFrame, rowData, columnData, rowIndex, button)
+				table:SetSelection(rowIndex)
+				if button == "LeftButton" then	
+					MetaEnginePanel.KeybindWindow.bindOld = rowData.Hotkey
+					MetaEnginePanel.KeybindWindow.bind = rowData.Hotkey
+					MetaEnginePanel.KeybindWindow:SetWindowTitle(rowData.Action)
+					MetaEnginePanel.KeybindWindow.messageLabel:SetText(rowData.Hotkey ~= "" and GetBindingText(rowData.Hotkey) or L["TAB"][tabName]["HOTKEYINSTRUCTION"])
+					MetaEnginePanel.KeybindWindow:Show()
+				elseif button == "RightButton" then
+					SetBindMetaEngine("")
+					MetaEnginePanel.KeybindWindow:Hide()					
+				end
+			end
+			MetaEnginePanel.OnEnterCell = function(table, cellFrame, rowFrame, rowData, columnData, rowIndex)
+				StdUi:ShowTooltip(cellFrame, true, L["TAB"][tabName]["METAENGINEROWTT"])
+				GameTooltip:ClearAllPoints()
+				StdUi:GlueAbove(GameTooltip, cellFrame, cellFrame:GetWidth(), 0, "RIGHT")
+			end
+			MetaEnginePanel.OnLeaveCell = function(table, cellFrame, rowFrame, rowData, columnData, rowIndex)
+				StdUi:ShowTooltip(cellFrame, false)
+			end
+			MetaEnginePanel.OnClickHeader = function(table, columnFrame, columnHeadFrame, columnIndex, button, ...)
+				table.SORTBY = columnIndex
+			end			
+			MetaEnginePanel.ScrollTable = StdUi:ScrollTable(MetaEnginePanel, { 
+				{
+					name = L["TAB"][tabName]["META"],
+                    width = 60,
+                    align = "CENTER",
+                    index = "Meta",
+					defaultSort = "desc", -- StdUi has bug with sorting, desc is actually asc
+                    format = "number",					
+				},
+				{
+					name = L["TAB"][tabName]["ACTION"],
+                    width = 200,
+                    align = "LEFT",
+                    index = "Action",
+                    format = "string",
+				},
+				{
+					name = L["TAB"][tabName]["HOTKEY"],
+                    width = 214,
+					defaultwidth = 214,
+                    align = "CENTER",
+                    index = "Hotkey",
+                    format = "custom",
+					renderer = function(cellFrame, value, rowData, columnData)
+						local slot = rowData.Slot
+						local hotkey = specDB.MetaEngine.Hotkeys[slot].hotkey
+						
+						if not cellFrame.texture then
+							local table = MetaEnginePanel.ScrollTable
+							local iconSize = columnData.iconSize or table.rowHeight
+							cellFrame.texture = table.stdUi:Texture(cellFrame, iconSize, iconSize, value)
+							cellFrame.texture:SetPoint("RIGHT", -15, 0)
+						end 
+						
+						if hotkey ~= "" then
+							cellFrame.text:SetText(GetBindingText(hotkey))
+							cellFrame.texture:SetTexture(nil)
+						else
+							cellFrame.text:SetText("")
+							cellFrame.texture:SetTexture("Interface/MacroFrame/MacroFrame-Icon.blp")
+						end						
+					end,
+				},
+            }, 15, 25)	
+			MetaEnginePanel.ScrollTable:RegisterEvents(
+				{ OnClick = MetaEnginePanel.OnClickCell, OnDoubleClick = MetaEnginePanel.OnDoubleClickCell, OnEnter = MetaEnginePanel.OnEnterCell, OnLeave = MetaEnginePanel.OnLeaveCell },
+				{ OnClick = MetaEnginePanel.OnClickHeader }
+			)
+			MetaEnginePanel.ScrollTable.SORTBY = 1
+			MetaEnginePanel.ScrollTable.defaultrows = { numberOfRows = MetaEnginePanel.ScrollTable.numberOfRows, rowHeight = MetaEnginePanel.ScrollTable.rowHeight }
+			MetaEnginePanel.ScrollTable:EnableSelection(true)
+			MetaEnginePanel.ScrollTable.MakeUpdate = function()
+				local self = MetaEnginePanel.ScrollTable
+				if not anchor:IsShown() or self.IsUpdating then -- anchor here because it's scroll child and methods :IsVisible and :IsShown can skip it in theory 
+					return 
+				end
+				
+				self.IsUpdating = true 
+				if not self.data then 
+					self.data = {}
+				else 
+					wipe(self.data)
+				end 
+
+				for slot, v in pairs(specDB.MetaEngine.Hotkeys) do
+					tinsert(self.data, {
+						Slot = slot,
+						Meta = v.meta,
+						Action = v.action,
+						Hotkey = v.hotkey,						
+					})
+				end
+				
+				self:ClearSelection()			
+				self:SetData(self.data)
+				self:SortData(self.SORTBY)
+				self.IsUpdating = nil 
+			end
+			StdUi:ClipScrollTableColumn(MetaEnginePanel.ScrollTable, 35)
+
+			-- UI: MetaEngine - KeybindWindow
+			MetaEnginePanel.KeybindWindow = StdUi:Confirm(L["TAB"][tabName]["HOTKEY"], L["TAB"][tabName]["HOTKEYINSTRUCTION"], {				
+				Unassign = {
+					text    = L["TAB"][tabName]["HOTKEYUNASSIGN"],
+					onClick = function(self)
+						SetBindMetaEngine("")
+						self.window:Hide()
+					end,
+				},
+				Assign = {
+					text    = L["TAB"][tabName]["HOTKEYASSIGN"],
+					onClick = function(self)
+						SetBindMetaEngine(self.window.bind)
+						self.window:Hide()
+					end,
+				},
+			})
+			StdUi:SetObjSize(MetaEnginePanel.KeybindWindow.buttons.Unassign, 140, 40)
+			MetaEnginePanel.KeybindWindow.buttons.Unassign:ClearAllPoints()
+			StdUi:GlueBottom(MetaEnginePanel.KeybindWindow.buttons.Unassign, MetaEnginePanel.KeybindWindow, 5 + MetaEnginePanel.KeybindWindow.buttons.Unassign:GetWidth() / 2, 15)
+			
+			StdUi:SetObjSize(MetaEnginePanel.KeybindWindow.buttons.Assign, 140, 40)
+			MetaEnginePanel.KeybindWindow.buttons.Assign:ClearAllPoints()
+			StdUi:GlueBottom(MetaEnginePanel.KeybindWindow.buttons.Assign, MetaEnginePanel.KeybindWindow, -5 - MetaEnginePanel.KeybindWindow.buttons.Assign:GetWidth() / 2, 15)
+			
+			MetaEnginePanel.KeybindWindow.messageLabel:SetFontSize(16)
+			MetaEnginePanel.KeybindWindow.backdrop = { MetaEnginePanel.KeybindWindow:GetBackdropColor() }
+			MetaEnginePanel.KeybindWindow.backdrop[4] = 0.95 -- Alpha, default: 0.8
+			MetaEnginePanel.KeybindWindow:SetBackdropColor(unpack(MetaEnginePanel.KeybindWindow.backdrop))
+			MetaEnginePanel.KeybindWindow:SetParent(MetaEnginePanel)
+			MetaEnginePanel.KeybindWindow:SetFrameStrata("DIALOG")
+			MetaEnginePanel.KeybindWindow:SetSize(700, 230)
+			MetaEnginePanel.KeybindWindow:SetShown(false)		
+			MetaEnginePanel.KeybindWindow:SetMovable(false)
+			MetaEnginePanel.KeybindWindow:RegisterForDrag("")
+			MetaEnginePanel.KeybindWindow:SetScript("OnDragStart", nil)
+			MetaEnginePanel.KeybindWindow:SetScript("OnDragStop", nil)
+			MetaEnginePanel.KeybindWindow:EnableKeyboard(true)
+			MetaEnginePanel.KeybindWindow:EnableGamePadButton(true)	
+			MetaEnginePanel.KeybindWindow.IgnoredKeyOrButton = {
+				LeftButton = true,
+				RightButton = true,
+				BUTTON1 = true,
+				BUTTON2 = true,
+				UNKNOWN = true,
+				ESCAPE = true,
+				LSHIFT = true,
+				RSHIFT = true,
+				LCTRL = true,
+				RCTRL = true,
+				LALT = true,
+				RALT = true,
+				LMETA = true,
+				RMETA = true,
+				LSTRG = true,
+				RSTRG = true,
+			}
+			MetaEnginePanel.KeybindWindow.ButtonFormat = {
+				LeftButton = "BUTTON1",
+				RightButton = "BUTTON2",
+				MiddleButton = "BUTTON3",	
+				[1] = "MOUSEWHEELUP",
+				[-1] = "MOUSEWHEELDOWN",
+			}
+			MetaEnginePanel.KeybindWindow.OnButton = function(self, keyOrButton)
+				if keyOrButton == "ESCAPE" then
+					self:Hide()
+					return
+				end
+				
+				if self.IgnoredKeyOrButton[keyOrButton] or _G.GetBindingFromClick(keyOrButton) == "SCREENSHOT" then
+					return
+				end
+
+				keyOrButton = self.ButtonFormat[keyOrButton] or keyOrButton	  
+				if keyOrButton then
+					keyOrButton = keyOrButton:upper()
+					-- Notes: That will be funny if STRG replaces CTRL on German and Austrian clients as bind modifier
+					self.bind = Action.strOnlyBuilder(_G.IsAltKeyDown() and "ALT-" or "", _G.IsControlKeyDown() and "CTRL-" or "", _G.IsShiftKeyDown() and "SHIFT-" or "", keyOrButton) -- Classic has issue with overlimit upvalues >60
+					self.messageLabel:SetText(GetBindingText(self.bind))
+				end
+			end
+			MetaEnginePanel.KeybindWindow:SetScript("OnKeyDown", MetaEnginePanel.KeybindWindow.OnButton)
+			MetaEnginePanel.KeybindWindow:SetScript("OnGamePadButtonDown", MetaEnginePanel.KeybindWindow.OnButton)
+			MetaEnginePanel.KeybindWindow:SetScript("OnMouseDown", MetaEnginePanel.KeybindWindow.OnButton)
+			MetaEnginePanel.KeybindWindow:SetScript("OnMouseWheel", MetaEnginePanel.KeybindWindow.OnButton)
+			
+			-- UI: MetaEngine - PrioritizePassive
+			MetaEnginePanel.PrioritizePassive = CreateCheckbox(MetaEnginePanel, 100, L["TAB"][tabName]["PRIORITIZEPASSIVE"], L["TAB"][tabName]["PRIORITIZEPASSIVETT"], specDB.MetaEngine, "PrioritizePassive")
+
+			-- UI: MetaEngine - checkselfcast
+			MetaEnginePanel.checkselfcast = CreateCheckbox(MetaEnginePanel, 100, L["TAB"][tabName]["CHECKSELFCAST"], L["TAB"][tabName]["CHECKSELFCASTTT"], specDB.MetaEngine, "checkselfcast")
+			
+			-- UI: MetaEngine - raid
+			MetaEnginePanel.raid = CreateCheckbox(MetaEnginePanel, 30, "@raid", L["TAB"][tabName]["UNITTT"], specDB.MetaEngine, "raid")
+			
+			-- UI: MetaEngine - party
+			MetaEnginePanel.party = CreateCheckbox(MetaEnginePanel, 30, "@party", L["TAB"][tabName]["UNITTT"], specDB.MetaEngine, "party")
+			
+			-- UI: MetaEngine - arena
+			MetaEnginePanel.arena = CreateCheckbox(MetaEnginePanel, 30, "@arena", L["TAB"][tabName]["UNITTT"], specDB.MetaEngine, "arena")
+					
+			-- Hides or shows panel with options
+			TMW:RegisterCallback("TMW_ACTION_METAENGINE_REFRESH_UI", DrawMetaEngine)
+			TMW:RegisterCallback("TMW_ACTION_METAENGINE_AUTH", DrawMetaEngine)
+			DrawMetaEngine()
+			
+			
+			------------------------------------- 
+			-- Add PanelFramework
+			PanelFramework:AddRow({ margin = { top = 25 } }):AddElement(PanelFramework.Category)
+			PanelFramework:DoLayout()
+			anchor:AddRow({ margin = { left = -15, right = -15 } }):AddElement(PanelFramework)	
+
+			-- Add MetaEnginePanel
+			MetaEnginePanel:AddRow({ margin = { top = 50, left = -10, right = -10 } }):AddElement(MetaEnginePanel.ScrollTable)
+			MetaEnginePanel.CheckboxRow1 = MetaEnginePanel:AddRow({ margin = { top = -10, bottom = 5 } })
+			MetaEnginePanel.CheckboxRow1:AddElement(MetaEnginePanel.PrioritizePassive, { column = 8 })
+			MetaEnginePanel.CheckboxRow1:AddElement(MetaEnginePanel.checkselfcast, { column = 4 })
+			MetaEnginePanel.CheckboxRow2 = MetaEnginePanel:AddRow({ margin = { top = -5, bottom = 5 } })
+			MetaEnginePanel.CheckboxRow2:AddElement(MetaEnginePanel.raid, { column = 4 })
+			MetaEnginePanel.CheckboxRow2:AddElement(MetaEnginePanel.party, { column = 4 })
+			MetaEnginePanel.CheckboxRow2:AddElement(MetaEnginePanel.arena, { column = 4 })
+			MetaEnginePanel:DoLayout()
+			anchor:AddRow({ margin = { top = -10, left = -15, right = -15 } }):AddElement(MetaEnginePanel)
+			
+			-- Add empty row 
+			anchor:AddRow({ margin = { top = -5 } }):AddElement(StdUi:LayoutSpace(anchor))	
+			
+			-- Fix StdUi 			
+			-- Lib is not optimized for resize since resizer changes only source parent, this is deep child parent 
+			function anchor:DoLayout()
+				local l = self.layout
+				local width = tab.frame:GetWidth() - l.padding.left - l.padding.right
+
+				local y = -l.padding.top
+				for i = 1, #self.rows do
+					local r = self.rows[i]
+					y = y - r:DrawRow(width, y)
+				end
+			end					
+			
+			anchor:DoLayout()	
+			anchor:SetScript("OnShow", DrawMetaEngine)						
+			
+			-- If we had return back to this tab then handler will be skipped 
+			if MainUI.RememberTab == tabName then
+				DrawMetaEngine()
+			end	
+		end
+		
 		StdUi:EnumerateToggleWidgets(tab.childs[spec], anchor) 
 	end)		
 end
@@ -15876,6 +17239,9 @@ local function OnInitialize()
 	-- Initialization LOS System
 	LineOfSight:Initialize()
 	
+	-- Initialization MacroAPI
+	MacroAPI:Initialize()	
+	
 	-- Initialization Cursor  
 	Cursor:Initialize()
 	
@@ -16192,6 +17558,8 @@ function Action:ADDON_LOADED(event, addonName)
 			ScreenshotHider:Reset()
 			-- LOS System  
 			LineOfSight:Reset()
+			-- MacroAPI
+			MacroAPI:Reset()
 			-- Cursor 
 			Cursor:Reset()
 			-- MSG System 
