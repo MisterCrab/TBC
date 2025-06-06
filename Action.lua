@@ -680,7 +680,7 @@ local Localization = {
 			},		
 			[9] = {
 				HEADBUTTON = "Hotkeys",
-				FRAMEWORK = "[Each spec] Framework",
+				FRAMEWORK = "Framework",
 				HOTKEYINSTRUCTION = "Press or click any hotkey or mouse button to assign",
 				META = "Meta",
 				METAENGINEROWTT = "Double Left Click assign hotkey\nDouble Right Click unassign hotkey",
@@ -1258,7 +1258,7 @@ local Localization = {
 			},					
 			[9] = {
 				HEADBUTTON = "Клавиши",
-				FRAMEWORK = "[Каждый спек] Каркас",
+				FRAMEWORK = "Каркас",
 				HOTKEYINSTRUCTION = "Нажмите или кликните любую горячую клавишу или кнопку мышки для назначения",
 				META = "Мета",
 				METAENGINEROWTT = "Двойной левый клик назначает горячую клавишу\nДвойной правый клик снимает назначение",
@@ -1836,7 +1836,7 @@ local Localization = {
 			},		
 			[9] = {
 				HEADBUTTON = "Tastenkürzel",
-				FRAMEWORK = "[Jede Spezialisierung] Rahmenwerk",
+				FRAMEWORK = "Rahmenwerk",
 				HOTKEYINSTRUCTION = "Drücken oder klicken Sie eine beliebige Hotkey- oder Maustaste, um zuzuweisen",
 				META = "Meta",
 				METAENGINEROWTT = "Doppel-Linksklick weist Hotkey zu\nDoppel-Rechtsklick hebt Hotkey auf",
@@ -2411,7 +2411,7 @@ local Localization = {
 			},		
 			[9] = {
 				HEADBUTTON = "Raccourcis",
-				FRAMEWORK = "[Chaque spé] Cadriciel",
+				FRAMEWORK = "Cadriciel",
 				HOTKEYINSTRUCTION = "Appuyez ou cliquez sur n’importe quelle touche de raccourci ou bouton de souris pour assigner",
 				META = "Meta",
 				METAENGINEROWTT = "Double clic gauche pour assigner le raccourci\nDouble clic droit pour désassigner le raccourci",
@@ -2990,7 +2990,7 @@ local Localization = {
 			},					
 			[9] = {
 				HEADBUTTON = "Tasti di scelta rapida",
-				FRAMEWORK = "[Ogni spec] Struttura",
+				FRAMEWORK = "Struttura",
 				HOTKEYINSTRUCTION = "Premi o clicca qualsiasi tasto rapido o pulsante del mouse per assegnare",
 				META = "Meta",
 				METAENGINEROWTT = "Doppio clic sinistro per assegnare il tasto rapido\nDoppio clic destro per rimuovere l’assegnazione",
@@ -3566,7 +3566,7 @@ local Localization = {
 			},					
 			[9] = {
 				HEADBUTTON = "Teclas rápidas",
-				FRAMEWORK = "[Cada especialización] Marco",
+				FRAMEWORK = "Marco",
 				HOTKEYINSTRUCTION = "Presione o haga clic en cualquier tecla rápida o botón del ratón para asignar",
 				META = "Meta",
 				METAENGINEROWTT = "Doble clic izquierdo para asignar la tecla rápida\nDoble clic derecho para desasignar la tecla rápida",
@@ -4141,7 +4141,7 @@ local Localization = {
 			},			
 			[9] = {
 				HEADBUTTON = "Atalhos",
-				FRAMEWORK = "[Cada especialização] Estrutura",
+				FRAMEWORK = "Estrutura",
 				HOTKEYINSTRUCTION = "Pressione ou clique em qualquer tecla de atalho ou botão do mouse para atribuir",
 				META = "Meta",
 				METAENGINEROWTT = "Duplo clique esquerdo para atribuir o atalho\nDuplo clique direito para desatribuir o atalho",
