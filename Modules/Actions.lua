@@ -1585,7 +1585,7 @@ function A.Create(args)
 			Structure and construction:
 				-- Means
 				@all 			- defined actions from Action[owner], Core.lua and undefined actions from Constans.lua, where owner is Action.PlayerSpec if Retail, otherwise Action.PlayerClass
-				@core			- defined actions from Core.lua and undefined actions from Constans.lua
+				@owner 			- defined actions from Action[owner]
 				N/A 			- not available
 				%expression% 	- value of expression
 				.. 				- concatenation
@@ -1599,13 +1599,13 @@ function A.Create(args)
 
 				-- Active
 				  slot	 description	  				variables	      			nameUI 						actions
-				• [1]  Active meta-button 			this1,  this1click  		"AntiFake CC"					only if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target 
-				• [2]  Active meta-button 			this2,  this2click  		"AntiFake Interrupt"			only if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target
-				• [5]  Active meta-button 			this5,  this5click  		"Trinket Rotation"				@all, 					   autounit resolves unit to mouseover, target, focustarget, targettarget (harm) and player
-				• [7]  Active meta-button 			this7,  this7click  		"AntiFake CC Focus"				only if action.IsAntiFake, autounit resolves unit to focus
-				• [8]  Active meta-button 			this8,  this8click  		"AntiFake Interrupt Focus"		only if action.IsAntiFake, autounit resolves unit to focus
-				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC Focus2"			only if action.IsAntiFake, autounit resolves unit to focus
-				• [10] Active meta-button 			this10, this10click 		"AntiFake Interrupt Focus2"		only if action.IsAntiFake, autounit resolves unit to focus
+				• [1]  Active meta-button 			this1,  this1click  		"AntiFake CC"					@owner if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target 
+				• [2]  Active meta-button 			this2,  this2click  		"AntiFake Interrupt"			@owner if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target
+				• [5]  Active meta-button 			this5,  this5click  		"Trinket Rotation"				@all, 					   	 autounit resolves unit to mouseover, target, focustarget, targettarget (harm) and player
+				• [7]  Active meta-button 			this7,  this7click  		"AntiFake CC Focus"				@owner if action.IsAntiFake, autounit resolves unit to focus
+				• [8]  Active meta-button 			this8,  this8click  		"AntiFake Interrupt Focus"		@owner if action.IsAntiFake, autounit resolves unit to focus
+				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC Focus2"			@owner if action.IsAntiFake, autounit resolves unit to focus
+				• [10] Active meta-button 			this10, this10click 		"AntiFake Interrupt Focus2"		@owner if action.IsAntiFake, autounit resolves unit to focus
 					Attributes						
 						this%slot%: 
 							"pressAndHoldAction", true
@@ -1636,11 +1636,11 @@ function A.Create(args)
 
 				-- Passive
 				  slot	 description	  				variables	      			nameUI 						actions
-				• [6]  Passive Rotation Unit1		this, thisclick6				N/A							@all, autounit resolves unit to arena1,raid1,party1
-				• [7]  Passive Rotation Unit2		this, thisclick7				N/A							@all, autounit resolves unit to arena2,raid2,party2
-				• [8]  Passive Rotation Unit3		this, thisclick8				N/A							@all, autounit resolves unit to arena3,raid3,party3
-				• [9]  Passive Rotation Unit4		this, thisclick9				N/A							@all, autounit resolves unit to arena4,raid4,party4
-				• [10] Passive Rotation Unit5		this, thisclick10				N/A							@all, autounit resolves unit to arena5,raid5,player
+				• [6]  Passive Rotation Unit1		this, thisclick6				N/A							@all if not action.IsAntiFake, autounit resolves unit to arena1,raid1,party1
+				• [7]  Passive Rotation Unit2		this, thisclick7				N/A							@all if not action.IsAntiFake, autounit resolves unit to arena2,raid2,party2
+				• [8]  Passive Rotation Unit3		this, thisclick8				N/A							@all if not action.IsAntiFake, autounit resolves unit to arena3,raid3,party3
+				• [9]  Passive Rotation Unit4		this, thisclick9				N/A							@all if not action.IsAntiFake, autounit resolves unit to arena4,raid4,party4
+				• [10] Passive Rotation Unit5		this, thisclick10				N/A							@all if not action.IsAntiFake, autounit resolves unit to arena5,raid5,player
 					Attributes							
 						this: 
 							"pressAndHoldAction", true
