@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "05.06.2025" -- ToDo: actual API is 19.12.2022 , fresh is just because of MetaEngine preparations
+local DateTime 														= "07.06.2025" -- ToDo: actual API is 19.12.2022 , fresh is just because of MetaEngine preparations
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -7629,7 +7629,7 @@ function Action:SetDefaultAction()
 	-- Used on Create by default or profile	
 	if not self.Hidden and self.Macro == "" and (self.Type == "Spell" or self.Type == "Item" or self.Type == "Potion" or self.Type == "Trinket") then		
 		-- Macro
-		if self.SubType == "TrinketBySlot" then 
+		if self.SubType == "TrinketBySlot" or self.SubType == "ItemBySlot" then 
 			-- /use 13, /use 14 is shorter than click
 			self:SetDefaultMacro()
 			return
@@ -7666,8 +7666,44 @@ function Action:SetDefaultAction()
 				end
 			end
 		elseif Click.type == "item" then
-			Click.item = Click.item or self.ID
+			-- itemID or itemName or bag, slot = "^(%d+)%s+(%d+)$") → slot = "^(%d+)$"
+			Click.item = Click.item or self.SlotID or self.ID
 			Click.spell = Click.spell or "nil"
+		elseif Click.type == "cancelaura" then		
+			Click.item = Click.item or "nil"
+			-- "unit", "spell"[, "rank"] → "target-slot" → "index"[, "filter"]
+			if not Click["target-slot"] and not Click.index then
+				-- "unit", "spell"[, "rank"]
+				Click.spell = Click.spell or self.ID
+				Click.unit = Click.unit or "player"
+				if not Click.rank then
+					if self.isRank then
+						Click.rank = self.isRank
+					elseif self.useMinRank then		
+						local rangeRank = 1
+						if type(self.useMaxRank) == "table" then
+							rangeRank = math_min(unpack(self.useMaxRank))
+						end
+						Click.rank = rangeRank
+					elseif self.useMaxRank then
+						local rangeRank = "nil"
+						if type(self.useMaxRank) == "table" then
+							rangeRank = math_max(unpack(self.useMaxRank))
+						end
+						Click.rank = rangeRank
+					else
+						Click.rank = "nil"
+					end
+				end
+			elseif Click["target-slot"] then
+				-- "target-slot"
+				Click.spell = "nil"
+				Click.index = "nil"			
+			elseif Click.index then				
+				-- "index"[, "filter"]
+				Click.spell = "nil"
+				Click["target-slot"] = "nil"
+			end
 		end
 
 		if not Click.unit and not Click.autounit then
