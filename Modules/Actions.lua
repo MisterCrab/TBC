@@ -1548,6 +1548,8 @@ function A.Create(args)
 
 							type = "spell" or "item" or ..., 		-- cannot be "macro" here, skip it unless you gonna use something especial like "toy" or "action" button as automatically only sets "spell" or "item"
 							typerelease = type, 					-- must be same as type
+							macrobefore = "macrotext",				-- macro to be used before click
+							macroafter = "macrotext",				-- macro to be used after click
 							spell = spellID or "spellName",			-- if type and typerelease is "spell"
 							item = itemID or "itemName",			-- if type and typerelease is "item"
 							... 									-- any custom key(@string)-value(@string,@boolean,@number) will be inserted also
@@ -1563,16 +1565,11 @@ function A.Create(args)
 			MetaEngine by default works inside of A[1]-A[10] functions and HealingEngine, although through callback it can be used anywhere as long as actions are created.
 			
 			Calling same action will not be performed twice until it will be rotated. Repeatedly call ExecuteScript is not possible within same iteration.
-			The main purpose of using Script is to update toggles and perform other buttons to inherit its attributes and pass them to the active meta-button, for example:
+			The main purpose of using Script is to update toggles and perform other buttons to inherit its attributes and pass them to the active meta-button but that will work as long as nothing else override it, for example:
 				Refs = { ["ToT"] = _G.ToT }
 				Script = 'local ToTMacro = self:GetFrameRef("ToT"):GetAttributes("macrotext"); this3:SetAttribute("macrotext", ToTMacro); this3:SetAttribute("macroactive", ToTMacro)'
 			That's it, you just connected the usual API to the MetaEngine for the 3rd active meta-button. "macroactive" is used to maintain the macrotext of ToTMacro in "macrotext" of meta-button when chained.
-			Alternatively, you can just set Click to click your button:
-				Click = {
-					type = "click",
-					clickbutton = _G.ToT,
-				}
-			Or through Macro:
+			Alternatively, you can just set Macro to click your button:
 				Macro = "/click ".._G.ToT:GetName()
 			
 			All General and HealingEngine actions are pre-allocated:

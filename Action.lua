@@ -7674,7 +7674,7 @@ function Action:SetDefaultAction()
 			-- "unit", "spell"[, "rank"] → "target-slot" → "index"[, "filter"]
 			if not Click["target-slot"] and not Click.index then
 				-- "unit", "spell"[, "rank"]
-				Click.spell = Click.spell or self.ID
+				Click.spell = Click.spell or self:Info()
 				Click.unit = Click.unit or "player"
 				if not Click.rank then
 					if self.isRank then
