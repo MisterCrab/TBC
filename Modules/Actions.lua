@@ -1615,6 +1615,7 @@ function A.Create(args)
 						this%slot%click:
 							"pressAndHoldAction", true
 							"type", "spell|item|..." -- cannot be "macro" here
+							"typerelease", type
 							"spell|item|...", spellID|itemID|...
 							"unit", unitID
 							"autounit", "harm|help|both"
@@ -1677,6 +1678,7 @@ function A.Create(args)
 						thisclick:
 							"pressAndHoldAction", true
 							"typerelease", "target|focus"
+							"type", typerelease -- if not Retail
 							"unit", unitID -- party1-4, player, partypet1-4, focus, raid1-40, raidpet1-40
 							... -- custom attributes by Script
 
