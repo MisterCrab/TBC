@@ -807,8 +807,8 @@ function A.Hide(icon)
 		end 
 		
 		if icon.attributes.state ~= CONST.TMW_DEFAULT_STATE_HIDE then 
-			icon:SetInfo("state; texture", CONST.TMW_DEFAULT_STATE_HIDE, "")
-			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", icon.ID, A)
+			TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", meta, A)
+			icon:SetInfo("state; texture", CONST.TMW_DEFAULT_STATE_HIDE, "")			
 		end 
 	end 
 end 
@@ -820,6 +820,10 @@ function A:Show(icon, texture)
 	else 
 		-- Sets ranks 
 		local meta = icon.ID
+		
+		-- Only fire for pure action object, moved here for performance
+		TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", meta, self.Start and self:IsQueued() and getmetatable(self).__index or self, texture)
+		
 		if meta == 3 then 
 			if not self.useMaxRank and self.isRank then 
 				if self.isRank ~= RankSingle.isColored then 
@@ -852,8 +856,6 @@ function A:Show(icon, texture)
 			TMWAPI(icon, self:Texture())
 		end 		
 		
-		-- Only fire for pure action object		
-		TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", icon.ID, self.Start and self:IsQueued() and getmetatable(self).__index or self, texture)
 		return true 
 	end 
 end 
