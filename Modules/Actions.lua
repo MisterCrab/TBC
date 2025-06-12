@@ -1601,8 +1601,8 @@ function A.Create(args)
 				• [5]  Active meta-button 			this5,  this5click  		"Trinket Rotation"				@all, 					   	 autounit resolves unit to mouseover, target, focustarget, targettarget (harm) and player
 				• [7]  Active meta-button 			this7,  this7click  		"AntiFake CC Focus"				@owner if action.IsAntiFake, autounit resolves unit to focus
 				• [8]  Active meta-button 			this8,  this8click  		"AntiFake Interrupt Focus"		@owner if action.IsAntiFake, autounit resolves unit to focus
-				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC Focus2"			@owner if action.IsAntiFake, autounit resolves unit to focus
-				• [10] Active meta-button 			this10, this10click 		"AntiFake Interrupt Focus2"		@owner if action.IsAntiFake, autounit resolves unit to focus
+				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC2"					@owner if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target
+				• [10] Active meta-button 			this10, this10click 		"AntiFake CC2 Focus2"			@owner if action.IsAntiFake, autounit resolves unit to focus
 					Attributes						
 						this%slot%: 
 							"pressAndHoldAction", true

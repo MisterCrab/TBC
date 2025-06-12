@@ -1,5 +1,5 @@
 --- 
-local DateTime 														= "10.06.2025" -- ToDo: actual API is 19.12.2022 , fresh is just because of MetaEngine preparations
+local DateTime 														= "12.06.2025" -- ToDo: actual API is 19.12.2022 , fresh is just because of MetaEngine preparations
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string = 
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -4719,8 +4719,8 @@ local Factory = {
 					[5] 							= { meta = 5,  action = "Trinket Rotation", 			hotkey = "" },
 					[7] 							= { meta = 7,  action = "AntiFake CC Focus", 			hotkey = "" },
 					[8] 							= { meta = 8,  action = "AntiFake Interrupt Focus", 	hotkey = "" },
-					[9] 							= { meta = 9,  action = "AntiFake CC Focus2", 			hotkey = "" },
-					[10] 							= { meta = 10, action = "AntiFake Interrupt Focus2", 	hotkey = "" },
+					[9] 							= { meta = 9,  action = "AntiFake CC2", 				hotkey = "" },
+					[10] 							= { meta = 10, action = "AntiFake CC2 Focus", 			hotkey = "" },
 				},
 				PrioritizePassive = true,
 				checkselfcast = false,
