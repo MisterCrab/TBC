@@ -72,8 +72,8 @@ function A.HeroSetHook(objects, metas)
 			I.SomeTrinket,
 		}, 
 		{
-			[3] = "TellMeWhen_Group4_Icon3",
-			[4] = "TellMeWhen_Group4_Icon4",
+			[3] = "TellMeWhen_Group2_Icon3",
+			[4] = "TellMeWhen_Group2_Icon4",
 		})
 	]]
 	-- Sets hook on call HR.Cast and HR.CastSuggested functions with relative frame for texture show 
@@ -86,12 +86,12 @@ function A.HeroSetHookAllTable(tabl, metas)
 	-- @usage 
 	--[[
 		A.HeroSetHookAllTable(S, {
-			[3] = "TellMeWhen_Group4_Icon3",
-			[4] = "TellMeWhen_Group4_Icon4",
+			[3] = "TellMeWhen_Group2_Icon3",
+			[4] = "TellMeWhen_Group2_Icon4",
 		})
 		A.HeroSetHookAllTable(I, {
-			[3] = "TellMeWhen_Group4_Icon3",
-			[4] = "TellMeWhen_Group4_Icon4",
+			[3] = "TellMeWhen_Group2_Icon3",
+			[4] = "TellMeWhen_Group2_Icon4",
 		})
 	]]
 	-- Does same as A.HeroSetHook but it takes all from direct table
@@ -110,8 +110,8 @@ local ObjKey = function(Object)
 		for meta, frame in pairs(IsHooked[Object.KEY]) do
 			if A[A[owner]] and A[A[owner]][meta] and A[A[owner]][Object.KEY] then 
 				A[A[owner]][Object.KEY]:Show(loadstring("return " .. frame)())
-				-- /run local a = assert(loadstring("return TellMeWhen_Group4_Icon4"))(); print(a)
-				-- /dump loadstring("return TellMeWhen_Group4_Icon4")()
+				-- /run local a = assert(loadstring("return TellMeWhen_Group2_Icon4"))(); print(a)
+				-- /dump loadstring("return TellMeWhen_Group2_Icon4")()
 			end 
 		end 
 	end 

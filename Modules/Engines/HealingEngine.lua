@@ -38,6 +38,7 @@ local TMW 								= _G.TMW
 
 local A 								= _G.Action
 local CONST 							= A.Const
+local UC								= A.Data.UC
 local Listener							= A.Listener
 local MakeFunctionCachedDynamic			= A.MakeFunctionCachedDynamic
 local MakeFunctionCachedStatic			= A.MakeFunctionCachedStatic
@@ -51,7 +52,7 @@ local AuraIsValid						= A.AuraIsValid
 local BuildToC							= A.BuildToC
 local StdUi								= A.StdUi
 local RunLua							= StdUi.RunLua
-local isClassic							= false -- StdUi.isClassic -- TBC has focus 
+local isClassic							= StdUi.isClassic 
 
 local GetLOS							= _G.GetLOS
 
@@ -119,6 +120,7 @@ local 	 UnitGUID, 	  UnitIsUnit 		=
 local PredictOptions, SelectStopOptions, dbUnitIDs, db, profileActionDB 
 local inCombat, inGroup, maxGroupSize  
 local player 							= "player"	 
+local pet 								= "pet" 
 local focus 							= "focus"
 local target 							= "target"
 local mouseover							= "mouseover"
@@ -138,129 +140,119 @@ frame:SetToplevel(true)
 frame:SetSize(1, 1)
 frame:SetScale(1)
 frame:SetPoint("TOPLEFT", 163, 0)
-frame.texture = frame:CreateTexture(nil, "TOOLTIP")
+frame.texture = frame:CreateTexture(nil, "OVERLAY")
 frame.texture:SetAllPoints(true)
 frame.Colors 							= {
-	none								= {0, 0, 0, 1},
-	-- Party 
-	party1								= {0.345098, 0.239216, 0.741176, 1},
-	party2								= {0.407843, 0.501961, 0.086275, 1},
-	party3								= {0.160784, 0.470588, 0.164706, 1},
-	party4								= {0.725490, 0.572549, 0.647059, 1},
-	-- Party pet
-	partypet1							= {0.486275, 0.176471, 1.000000, 1},
-	partypet2							= {0.031373, 0.572549, 0.152941, 1},
-	partypet3							= {0.874510, 0.239216, 0.239216, 1},
-	partypet4							= {0.117647, 0.870588, 0.635294, 1},	
+	none								= { UC[0]() },
 	-- Raid 
-	raid1								= {0.192157, 0.878431, 0.015686, 1},
-	raid2								= {0.780392, 0.788235, 0.745098, 1},
-	raid3								= {0.498039, 0.184314, 0.521569, 1},
-	raid4								= {0.627451, 0.905882, 0.882353, 1},
-	raid5								= {0.145098, 0.658824, 0.121569, 1},
-	raid6								= {0.639216, 0.490196, 0.921569, 1},
-	raid7								= {0.172549, 0.368627, 0.427451, 1},
-	raid8								= {0.949020, 0.333333, 0.980392, 1},
-	raid9								= {0.109804, 0.388235, 0.980392, 1},
-	raid10								= {0.615686, 0.694118, 0.435294, 1},
-	raid11								= {0.066667, 0.243137, 0.572549, 1},
-	raid12								= {0.113725, 0.129412, 1.000000, 1},
-	raid13								= {0.592157, 0.023529, 0.235294, 1},
-	raid14								= {0.545098, 0.439216, 1.000000, 1},
-	raid15								= {0.890196, 0.800000, 0.854902, 1},
-	raid16								= {0.513725, 0.854902, 0.639216, 1},
-	raid17								= {0.078431, 0.541176, 0.815686, 1},
-	raid18								= {0.109804, 0.184314, 0.666667, 1},
-	raid19								= {0.650980, 0.572549, 0.098039, 1},
-	raid20								= {0.541176, 0.466667, 0.027451, 1},
-	raid21								= {0.000000, 0.988235, 0.462745, 1},
-	raid22								= {0.211765, 0.443137, 0.858824, 1},
-	raid23								= {0.949020, 0.949020, 0.576471, 1},
-	raid24								= {0.972549, 0.800000, 0.682353, 1},
-	raid25								= {0.031373, 0.619608, 0.596078, 1},
-	raid26								= {0.670588, 0.925490, 0.513725, 1},
-	raid27								= {0.647059, 0.945098, 0.031373, 1},
-	raid28								= {0.058824, 0.490196, 0.054902, 1},
-	raid29								= {0.050980, 0.992157, 0.239216, 1},
-	raid30								= {0.949020, 0.721569, 0.388235, 1},
-	raid31								= {0.254902, 0.749020, 0.627451, 1},
-	raid32								= {0.470588, 0.454902, 0.603922, 1},
-	raid33								= {0.384314, 0.062745, 0.266667, 1},
-	raid34								= {0.639216, 0.168627, 0.447059, 1},
-	raid35								= {0.874510, 0.058824, 0.400000, 1},
-	raid36								= {0.925490, 0.070588, 0.713725, 1},
-	raid37								= {0.098039, 0.803922, 0.905882, 1},
-	raid38								= {0.243137, 0.015686, 0.325490, 1},
-	raid39								= {0.847059, 0.376471, 0.921569, 1},
-	raid40								= {0.341176, 0.533333, 0.231373, 1},
-	-- Raid pet
-	raidpet1							= {0.458824, 0.945098, 0.784314, 1},
-	raidpet2							= {0.239216, 0.654902, 0.278431, 1},
-	raidpet3							= {0.537255, 0.066667, 0.905882, 1},
-	raidpet4							= {0.333333, 0.415686, 0.627451, 1},
-	raidpet5							= {0.576471, 0.811765, 0.011765, 1},
-	raidpet6							= {0.517647, 0.164706, 0.627451, 1},
-	raidpet7							= {0.439216, 0.074510, 0.941176, 1},
-	raidpet8							= {0.984314, 0.854902, 0.376471, 1},
-	raidpet9							= {0.082353, 0.286275, 0.890196, 1},
-	raidpet10							= {0.058824, 0.003922, 0.964706, 1},
-	raidpet11							= {0.956863, 0.509804, 0.949020, 1},
-	raidpet12							= {0.474510, 0.858824, 0.031373, 1},
-	raidpet13							= {0.509804, 0.882353, 0.423529, 1},
-	raidpet14							= {0.337255, 0.647059, 0.427451, 1},
-	raidpet15							= {0.611765, 0.525490, 0.352941, 1},
-	raidpet16							= {0.921569, 0.129412, 0.913725, 1},
-	raidpet17							= {0.117647, 0.933333, 0.862745, 1},
-	raidpet18							= {0.733333, 0.015686, 0.937255, 1},
-	raidpet19							= {0.819608, 0.392157, 0.686275, 1},
-	raidpet20							= {0.823529, 0.976471, 0.541176, 1},
-	raidpet21							= {0.043137, 0.305882, 0.800000, 1},
-	raidpet22							= {0.737255, 0.270588, 0.760784, 1},
-	raidpet23							= {0.807843, 0.368627, 0.058824, 1},
-	raidpet24							= {0.364706, 0.078431, 0.078431, 1},
-	raidpet25							= {0.094118, 0.901961, 1.000000, 1},
-	raidpet26							= {0.772549, 0.690196, 0.047059, 1},
-	raidpet27							= {0.415686, 0.784314, 0.854902, 1},
-	raidpet28							= {0.470588, 0.733333, 0.047059, 1},
-	raidpet29							= {0.619608, 0.086275, 0.572549, 1},
-	raidpet30							= {0.517647, 0.352941, 0.678431, 1},
-	raidpet31							= {0.003922, 0.149020, 0.694118, 1},
-	raidpet32							= {0.454902, 0.619608, 0.831373, 1},
-	raidpet33							= {0.674510, 0.741176, 0.050980, 1},
-	raidpet34							= {0.560784, 0.713725, 0.784314, 1},
-	raidpet35							= {0.400000, 0.721569, 0.737255, 1},
-	raidpet36							= {0.094118, 0.274510, 0.392157, 1},
-	raidpet37							= {0.298039, 0.498039, 0.462745, 1},
-	raidpet38							= {0.125490, 0.196078, 0.027451, 1},
-	raidpet39							= {0.937255, 0.564706, 0.368627, 1},
-	raidpet40							= {0.929412, 0.592157, 0.501961, 1},
+	raid1								= { UC[1]() },
+	raid2								= { UC[2]() },
+	raid3								= { UC[3]() },
+	raid4								= { UC[4]() },
+	raid5								= { UC[5]() },
+	raid6								= { UC[6]() },
+	raid7								= { UC[7]() },
+	raid8								= { UC[8]() },
+	raid9								= { UC[9]() },
+	raid10								= { UC[10]() },
+	raid11								= { UC[11]() },
+	raid12								= { UC[12]() },
+	raid13								= { UC[13]() },
+	raid14								= { UC[14]() },
+	raid15								= { UC[15]() },
+	raid16								= { UC[16]() },
+	raid17								= { UC[17]() },
+	raid18								= { UC[18]() },
+	raid19								= { UC[19]() },
+	raid20								= { UC[20]() },
+	raid21								= { UC[21]() },
+	raid22								= { UC[22]() },
+	raid23								= { UC[23]() },
+	raid24								= { UC[24]() },
+	raid25								= { UC[25]() },
+	raid26								= { UC[26]() },
+	raid27								= { UC[27]() },
+	raid28								= { UC[28]() },
+	raid29								= { UC[29]() },
+	raid30								= { UC[30]() },
+	raid31								= { UC[31]() },
+	raid32								= { UC[32]() },
+	raid33								= { UC[33]() },
+	raid34								= { UC[34]() },
+	raid35								= { UC[35]() },
+	raid36								= { UC[36]() },
+	raid37								= { UC[37]() },
+	raid38								= { UC[38]() },
+	raid39								= { UC[39]() },
+	raid40								= { UC[40]() },
+	-- Party 
+	party1								= { UC[41]() },
+	party2								= { UC[42]() },
+	party3								= { UC[43]() },
+	party4								= { UC[44]() },	
 	-- Player 
-	player 								= {0.788235, 0.470588, 0.858824, 1},
+	player 								= { UC[45]() },	
 	-- Focus 
-	focus 								= {0.615686, 0.227451, 0.988235, 1},
-	-- Reserved
-	--[[
-	PLACEHOLDER							= {0.411765, 0.760784, 0.176471, 1},
-	PLACEHOLDER							= {0.780392, 0.286275, 0.415686, 1},
-	PLACEHOLDER							= {0.584314, 0.811765, 0.956863, 1},
-	PLACEHOLDER							= {0.513725, 0.658824, 0.650980, 1},
-	PLACEHOLDER							= {0.913725, 0.180392, 0.737255, 1},
-	PLACEHOLDER							= {0.576471, 0.250980, 0.160784, 1},
-	PLACEHOLDER							= {0.803922, 0.741176, 0.874510, 1},
-	PLACEHOLDER							= {0.647059, 0.874510, 0.713725, 1},
-	PLACEHOLDER							= {0.007843, 0.301961, 0.388235, 1},
-	PLACEHOLDER							= {0.572549, 0.705882, 0.984314, 1},
-	--]]
+	focus 								= { UC[46]() },	
+	-- Party pet
+	partypet1							= { UC[47]() },
+	partypet2							= { UC[48]() },
+	partypet3							= { UC[49]() },
+	partypet4							= { UC[50]() },		
+	-- Raid pet
+	raidpet1							= { UC[51]() },
+	raidpet2							= { UC[52]() },
+	raidpet3							= { UC[53]() },
+	raidpet4							= { UC[54]() },
+	raidpet5							= { UC[55]() },
+	raidpet6							= { UC[56]() },
+	raidpet7							= { UC[57]() },
+	raidpet8							= { UC[58]() },
+	raidpet9							= { UC[59]() },
+	raidpet10							= { UC[60]() },
+	raidpet11							= { UC[61]() },
+	raidpet12							= { UC[62]() },
+	raidpet13							= { UC[63]() },
+	raidpet14							= { UC[64]() },
+	raidpet15							= { UC[65]() },
+	raidpet16							= { UC[66]() },
+	raidpet17							= { UC[67]() },
+	raidpet18							= { UC[68]() },
+	raidpet19							= { UC[69]() },
+	raidpet20							= { UC[70]() },
+	raidpet21							= { UC[71]() },
+	raidpet22							= { UC[72]() },
+	raidpet23							= { UC[73]() },
+	raidpet24							= { UC[74]() },
+	raidpet25							= { UC[75]() },
+	raidpet26							= { UC[76]() },
+	raidpet27							= { UC[77]() },
+	raidpet28							= { UC[78]() },
+	raidpet29							= { UC[79]() },
+	raidpet30							= { UC[80]() },
+	raidpet31							= { UC[81]() },
+	raidpet32							= { UC[82]() },
+	raidpet33							= { UC[83]() },
+	raidpet34							= { UC[84]() },
+	raidpet35							= { UC[85]() },
+	raidpet36							= { UC[86]() },
+	raidpet37							= { UC[87]() },
+	raidpet38							= { UC[88]() },
+	raidpet39							= { UC[89]() },
+	raidpet40							= { UC[90]() },
 }
 function frame:SetColor(unitID)
 	local unit = unitID or none
 	if (self.unit ~= unit or self.mode ~= isFocusHealing) and self.Colors[unit] then 	
-		self.texture:SetColorTexture(unpack(self.Colors[unit]))
-		self.unit = unit 
+		local colorR, colorG, colorB, colorA = unpack(self.Colors[unit])
+		if A.MetaEngine and A.MetaEngine:IsHealthy() and GetToggle(1, "DisableRegularFrames") then
+			colorA = 0
+		end
+		self.texture:SetColorTexture(colorR, colorG, colorB, colorA)
 		self.unit = unit
 		self.mode = isFocusHealing
 		TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "HealingEngine", isFocusHealing and "focus" or "target", unit)
-	end 		
+	end 
 end; frame:SetColor()
 
 local function sort_high(x, y)			-- TODO: Remove (old profiles)
@@ -532,7 +524,7 @@ do
 		end,
 		CanRessurect					= function(self)
 			local unitID 				= self.Unit 
-			return not inCombat and not self.isSelf and self.isPlayer and db.SelectResurrects and not A_Unit(unitID):IsGhost() and not A_Unit(unitID):GetIncomingResurrection() and (not isClassic or playerClass ~= "DRUID")
+			return not inCombat and not self.isSelf and self.isPlayer and db.SelectResurrects and not A_Unit(unitID):IsGhost() and not A_Unit(unitID):GetIncomingResurrection() and (BuildToC >= 20000 or playerClass ~= "DRUID")
 		end,
 		SetupOffsets 					= function(self, manualOffset, autoOffset)
 			if manualOffset == 0 then 
@@ -685,23 +677,39 @@ do
 end 
 
 local member, memberGUID, memberData
-local playerGUID, focusGUID 
+local playerGUID, petGUID, focusGUID 
 local function OnUpdate()   
     -- Wipe previous 
 	UnitIDs:Wipe() 
 	SortedUnitIDs:Wipe()
 	SortedUnitIDs_MostlyIncDMG:Wipe()
 	QueueOrder:Wipe()
-	playerGUID, focusGUID 				= nil, nil 
+	playerGUID, petGUID, focusGUID 		= nil, nil, nil
 	
-	-- Player (solo/party)
-    if inGroup ~= "raid" then 
+	-- Solo
+    if not inGroup then 
+		-- Player 
 		member 							= player  
 		memberGUID 						= TeamCacheFriendlyUNITs[member]	
 		if memberGUID then 
-			--playerGUID					= memberGUID -- Save for future referrence
+			playerGUID					= memberGUID -- Save for future referrence
 			memberData 					= UnitIDs[member]
 			memberData:Setup(member, memberGUID, true)				
+			FrequencyTemp.MHP 			= (FrequencyTemp.MHP or 0) + memberData.MHP 
+			FrequencyTemp.AHP 			= (FrequencyTemp.AHP or 0) + memberData.realAHP				
+			if memberData.isSelectAble then 
+				SortedUnitIDs[#SortedUnitIDs + 1] 							= memberData
+				SortedUnitIDs_MostlyIncDMG[#SortedUnitIDs_MostlyIncDMG + 1] = memberData
+			end 
+		end 
+		
+		-- Pet
+		member 							= pet  
+		memberGUID 						= TeamCacheFriendlyUNITs[member]	
+		if memberGUID then 
+			petGUID						= memberGUID -- Save for future referrence
+			memberData 					= UnitIDs[member]
+			memberData:Setup(member, memberGUID, false)				
 			FrequencyTemp.MHP 			= (FrequencyTemp.MHP or 0) + memberData.MHP 
 			FrequencyTemp.AHP 			= (FrequencyTemp.AHP or 0) + memberData.realAHP				
 			if memberData.isSelectAble then 
@@ -712,13 +720,13 @@ local function OnUpdate()
     end 
 	
 	-- Focus 
-	if not isClassic and not TeamCacheFriendlyGUIDs[focus] and not A_Unit(focus):IsEnemy() then 
+	if BuildToC >= 20000 then 
 		-- Replaces party/raid unit by self
 		-- We have to replace member by focus only in case if focus is not member of the group
 		-- This need for /focus macros otherwise toggles will not work through specific unit (e.g. raid1, party1) if its equal to focus unit like you can't /focus focus
 		member 							= focus
 		memberGUID						= UnitGUID(member)		
-		if memberGUID and memberGUID ~= playerGUID then 
+		if memberGUID and memberGUID ~= playerGUID and memberGUID ~= petGUID and not TeamCacheFriendlyGUIDs[memberGUID] and not A_Unit(focus):IsEnemy() then 
 			focusGUID					= memberGUID -- Save for future referrence
 			memberData 					= UnitIDs[member]
 			memberData:Setup(member, memberGUID, A_Unit(member):IsPlayer() or false)	
@@ -729,13 +737,13 @@ local function OnUpdate()
 				SortedUnitIDs_MostlyIncDMG[#SortedUnitIDs_MostlyIncDMG + 1] = memberData
 			end 
 		end 
-	end
+	end 
             
 	-- Group 
 	if inGroup then 
 		for i = 1, maxGroupSize do
 			-- Players 
-			member 						= TeamCacheFriendlyIndexToPLAYERs[i]   
+			member 						= TeamCacheFriendlyIndexToPLAYERs[i]   	-- 5th index is player in party group
 			memberGUID 					= member and TeamCacheFriendlyUNITs[member]					
 			if memberGUID and memberGUID ~= focusGUID then				
 				memberData 				= UnitIDs[member]
@@ -749,7 +757,7 @@ local function OnUpdate()
 			end 
 			
 			-- Pets
-			member 						= TeamCacheFriendlyIndexToPETs[i]
+			member 						= TeamCacheFriendlyIndexToPETs[i]		-- 5th index is player in party group
 			memberGUID 					= member and TeamCacheFriendlyUNITs[member]
 			if memberGUID and memberGUID ~= focusGUID then 
 				memberData 				= UnitIDs[member]
@@ -834,6 +842,7 @@ local function SetHealingTarget()
 end
 
 local function SetColorTarget()
+	-- If we have no one to heal or we have already selected unit that need to heal
 	isFocusHealing = (BuildToC >= 20000 and not SelectStopOptions[1] and not SelectStopOptions[2] and not SelectStopOptions[3] and not SelectStopOptions[4] and not SelectStopOptions[5] and not SelectStopOptions[6])
 	-- If we have no one to heal or we have already selected unit that need to heal	
 	if 	healingTarget == none or healingTargetGUID == none or 
@@ -841,7 +850,7 @@ local function SetColorTarget()
 		(not isFocusHealing and healingTargetGUID == UnitGUID(target)) or 
 		-- /focus mode
 		(isFocusHealing and healingTargetGUID == UnitGUID(focus))
-	then				
+	then
 		return frame:SetColor(none)
 	end	
 	
@@ -885,7 +894,7 @@ local function UpdateTargetLOS()
 end
 
 local function PLAYER_TARGET_CHANGED()
-	ClearHealingTarget()
+	SetColorTarget()
 	-- [3] @target enemy or [4] @target boss
 	if db.AfterTargetEnemyOrBossDelay > 0 and (not SelectStopOptions[3] or not SelectStopOptions[4]) then 
 		if ((not SelectStopOptions[3] and A_Unit(target):IsEnemy()) or (not SelectStopOptions[4] and A_Unit(target):IsBoss())) then 
@@ -902,7 +911,7 @@ local function PLAYER_TARGET_CHANGED()
 end 
 
 local function UPDATE_MOUSEOVER_UNIT()
-	ClearHealingTarget()
+	SetColorTarget()
 	-- [2] @mouseover enemy 
 	if db.AfterMouseoverEnemyDelay > 0 and not SelectStopOptions[2] then 
 		if A_Unit(mouseover):IsEnemy() then 
@@ -944,8 +953,13 @@ local function Initialize()
 		dbUnitIDs			= db.UnitIDs				
 	end 
 
-	if A.IamHealer or (isClassic and GetToggle(1, "HE_AnyRole")) then 
+	-- Since release of MetaEngine, all classes and specializations have HealingEngine API
+	-- It can be disabled in case of performance issues or when doesn't need
+	if GetToggle(8, "HealingEngineAPI") then
 		if not Data.IsRunning then 
+			if BuildToC >= 20000 then 
+				Listener:Add("ACTION_EVENT_HEALINGENGINE", "PLAYER_FOCUS_CHANGED", 	SetColorTarget)
+			end 		
 			Listener:Add("ACTION_EVENT_HEALINGENGINE", "PLAYER_TARGET_CHANGED", 	PLAYER_TARGET_CHANGED)
 			Listener:Add("ACTION_EVENT_HEALINGENGINE", "UPDATE_MOUSEOVER_UNIT", 	UPDATE_MOUSEOVER_UNIT)
 			Listener:Add("ACTION_EVENT_HEALINGENGINE", "UNIT_TARGET", 				UNIT_TARGET)
@@ -982,6 +996,9 @@ local function Initialize()
 		end 
 	else
 		if Data.IsRunning then
+			if BuildToC >= 20000 then 
+				Listener:Remove("ACTION_EVENT_HEALINGENGINE", "PLAYER_FOCUS_CHANGED")
+			end 		
 			Listener:Remove("ACTION_EVENT_HEALINGENGINE", "PLAYER_TARGET_CHANGED")
 			Listener:Remove("ACTION_EVENT_HEALINGENGINE", "UPDATE_MOUSEOVER_UNIT")
 			Listener:Remove("ACTION_EVENT_HEALINGENGINE", "UNIT_TARGET")
@@ -1001,9 +1018,7 @@ local function Initialize()
 	end 
 end 
 
-if isClassic then 
-	TMW:RegisterCallback("TMW_ACTION_HEALINGENGINE_ANY_ROLE", 					Initialize)
-end 
+TMW:RegisterCallback("TMW_ACTION_HEALINGENGINE_INITIALIZE", 					Initialize) 
 TMW:RegisterCallback("TMW_ACTION_PLAYER_SPECIALIZATION_CHANGED", 				Initialize) 
 TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED", 								Initialize) 
 TMW:RegisterCallback("TMW_ACTION_DB_UPDATED",									function(callbackEvent, pActionDB)
@@ -1070,7 +1085,6 @@ Listener:Add("ACTION_EVENT_HEALINGENGINE", "PLAYER_REGEN_DISABLED", 			function(
 end)
 
 -- ============================= API ==============================
--- API valid only for healer specializations  
 
 -- Globals
 A.HealingEngine = { Data = Data }
@@ -1098,19 +1112,23 @@ end
 function HealingEngine.SetTargetMostlyIncDMG(delay)
 	-- Sets in HealingEngine specified unitID with delay which will prevent reset target during next few seconds 	
 	if #SortedUnitIDs_MostlyIncDMG > 0 then 
-		healingTargetDelay 	= TMW.time + (delay or 2)
+		local wasSet = SortedUnitIDs_MostlyIncDMG[1].Unit == healingTarget
+		healingTargetDelay 	= TMW.time + (delay or 0.5)
 		healingTargetGUID 	= SortedUnitIDs_MostlyIncDMG[1].GUID
 		healingTarget		= SortedUnitIDs_MostlyIncDMG[1].Unit
-		frame:SetColor(healingTarget) 
+		if healingTarget and not wasSet then 
+			frame:SetColor(healingTarget) 
+		end
 	end 
 end 
 
 function HealingEngine.SetTarget(unitID, delay)
 	-- Sets in HealingEngine specified unitID with delay which will prevent reset target during next few seconds 	
+	local wasSet = unitID == healingTarget
 	healingTargetGUID 		= TeamCacheFriendlyUNITs[unitID] or UnitGUID(unitID)
 	healingTarget			= TeamCacheFriendlyGUIDs[healingTargetGUID]
-	if healingTarget then 
-		healingTargetDelay 	= TMW.time + (delay or 2)
+	if healingTarget and not wasSet then 
+		healingTargetDelay 	= TMW.time + (delay or 0.5)
 		frame:SetColor(healingTarget)		 
 	end 
 end
@@ -1430,7 +1448,7 @@ function HealingEngine.GetOptionsByUnitID(unitID, unitGUID)
 	-- Note: Don't change key-values in returned [5] table, only for referrence usage!
 	local GUID = unitGUID or UnitGUID(unitID)
 	if GUID then 
-		if GUID == focusGUID then 
+		if GUID == focusGUID and BuildToC >= 20000 then 
 			local dbUnit = dbUnitIDs.focus
 			if dbUnit then 
 				return dbUnit.useDispel, dbUnit.useShields, dbUnit.useHoTs, dbUnit.useUtils, dbUnit

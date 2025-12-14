@@ -4,12 +4,12 @@ if not StdUi then
 	return
 end
 
-local module, version = 'Config', 4;
+local module, version = 'Config', 5;
 if not StdUi:UpgradeNeeded(module, version) then
 	return
 end
 
-local IsAddOnLoaded = IsAddOnLoaded;
+local IsAddOnLoaded = C_AddOns.IsAddOnLoaded or IsAddOnLoaded;
 
 StdUi.config = {};
 
@@ -22,7 +22,7 @@ function StdUi:ResetConfig()
 			family    = font,
 			size      = fontSize,
 			titleSize = largeFontSize,
-			effect    = 'NONE',
+			effect    = '',
 			strata    = 'OVERLAY',
 			color     = {
 				normal   = { r = 1, g = 1, b = 1, a = 1 },

@@ -1,3 +1,16 @@
+[Priest v19]
+Mind Flay 							- Added all ranks
+
+[Priest v18]
+Removed HE_AnyRole toggle check
+Optimized code for MetaEngine release
+Optimized code for 5-Unit system release
+
+[Priest v17]
+PowerWordShield 					- Now respect HP slider from HolyNova & PoWS section on normal rotation phase except casters with mana resource
+PowerWordShield 					- Now respect HP slider from HolyNova & PoWS section on SelfPoWs checkbox except when we need shield self buff if we got attacked by enemies to stop mini interrupts caused by attacker's damage
+HolyNova							- Fixed when Set Blocker didn't work for it
+
 [Priest v16]
 Fixed lua error ...HealingEngine.lua:1384: Usage: UnitGUID("unit") caused by Snippet: Priest line 1409 incorrect unitID
 Fixed lua errpr .. Prediction Healing:95: attempt to index global 'description' (a nil value)

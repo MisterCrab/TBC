@@ -15,7 +15,7 @@ local isEnemy										= A.Bit.isEnemy
 local TeamCacheFriendly								= A.TeamCache.Friendly
 local TeamCacheFriendlyUNITs						= TeamCacheFriendly.UNITs	 
 	  
-local CombatLogGetCurrentEventInfo					= _G.CombatLogGetCurrentEventInfo		  
+local CombatLogGetCurrentEventInfo					= _G.CombatLogGetCurrentEventInfo or _G.C_CombatLog.GetCurrentEventInfo
 	  
 local 	 UnitIsUnit, 	UnitGUID, 	 UnitCanAttack 	= 
 	  _G.UnitIsUnit, _G.UnitGUID, _G.UnitCanAttack
@@ -270,6 +270,10 @@ function A.MultiUnits.GetByRange(self, range, count)
 		end 
 	end  
 	
+	if total == 0 and A_Unit("target"):CanInterract(range) then 
+		total = total + 1 
+	end 		
+	
 	return total 	
 end 
 A.MultiUnits.GetByRange = A.MakeFunctionCachedDynamic(A.MultiUnits.GetByRange)
@@ -289,6 +293,10 @@ function A.MultiUnits.GetByRangeInCombat(self, range, count, upTTD)
 			break 
 		end 
 	end 
+	
+	if total == 0 and A_Unit("target"):CanInterract(range) and A_Unit("target"):CombatTime() > 0 then 
+		total = total + 1 
+	end 		
 	
 	return total 
 end 

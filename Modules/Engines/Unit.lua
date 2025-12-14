@@ -7,21 +7,26 @@ local math_floor							= math.floor
 local math_random							= math.random
 local wipe 									= _G.wipe 
 local strsplit								= _G.strsplit
+local strjoin								= _G.strjoin
 local debugstack							= _G.debugstack	  
 	  
 local TMW 									= _G.TMW
 local CNDT 									= TMW.CNDT
 local Env 									= CNDT.Env
-local AuraTooltipNumber						= Env.AuraTooltipNumber
+--local AuraTooltipNumber					= Env.AuraTooltipNumber -- this is broken
+local AuraTooltipNumberPacked 				= Env.AuraTooltipNumberPacked
 local AuraVariableNumber 					= Env.AuraVariableNumber
 local strlowerCache  						= TMW.strlowerCache
 
 local LibStub								= _G.LibStub
-local HealComm 								= LibStub("LibHealComm-4.0", true) -- Note: Leave it with true in case if will need to disable lib, seems lib causing unexpected lua errors in PvP 
-local LibRangeCheck  						= LibStub("LibRangeCheck-2.0")
+local ThreatLib  							= LibStub("LibThreatClassic2", true) 	-- Any modern classic expansion now has built-in threat metrics. Compatible code will be keept for possible private servers.
+local HealComm 								= LibStub("LibHealComm-4.0", true) 		-- Any modern classic expansion now has built-in incoming healing prediction metrics (although for Classic HoTs are still not same like on retail). Compatible code will be keept for possible private servers.
+local LibRangeCheck  						= LibStub("LibRangeCheck-3.0")
 local LibBossIDs							= LibStub("LibBossIDs-1.0").BossIDs
+local LibClassicCasterino 					= LibStub("LibClassicCasterino", true)
 
 local A   									= _G.Action	
+local BuildToC								= A.BuildToC
 local CONST 								= A.Const
 local Listener								= A.Listener
 local insertMulti							= A.TableInsertMulti
@@ -34,6 +39,7 @@ local MultiUnits							= A.MultiUnits
 local GetToggle								= A.GetToggle
 local MouseHasFrame							= A.MouseHasFrame
 local UnitInLOS								= A.UnitInLOS
+local UnitSpecsMap							= A.UnitSpecsMap
 
 local TeamCache								= A.TeamCache
 local TeamCachethreatData					= TeamCache.threatData
@@ -42,11 +48,21 @@ local TeamCacheFriendlyUNITs				= TeamCacheFriendly.UNITs
 local TeamCacheFriendlyGUIDs				= TeamCacheFriendly.GUIDs
 local TeamCacheFriendlyIndexToPLAYERs		= TeamCacheFriendly.IndexToPLAYERs
 local TeamCacheFriendlyIndexToPETs			= TeamCacheFriendly.IndexToPETs
+local TeamCacheFriendlyHEALER				= TeamCacheFriendly.HEALER
+local TeamCacheFriendlyTANK					= TeamCacheFriendly.TANK
+local TeamCacheFriendlyDAMAGER				= TeamCacheFriendly.DAMAGER
+local TeamCacheFriendlyDAMAGER_MELEE		= TeamCacheFriendly.DAMAGER_MELEE
+--local TeamCacheFriendlyDAMAGER_RANGE		= TeamCacheFriendly.DAMAGER_RANGE
 local TeamCacheEnemy 						= TeamCache.Enemy
 local TeamCacheEnemyUNITs					= TeamCacheEnemy.UNITs
 local TeamCacheEnemyGUIDs					= TeamCacheEnemy.GUIDs
 local TeamCacheEnemyIndexToPLAYERs			= TeamCacheEnemy.IndexToPLAYERs
 local TeamCacheEnemyIndexToPETs				= TeamCacheEnemy.IndexToPETs
+local TeamCacheEnemyHEALER					= TeamCacheEnemy.HEALER
+local TeamCacheEnemyTANK					= TeamCacheEnemy.TANK
+local TeamCacheEnemyDAMAGER					= TeamCacheEnemy.DAMAGER
+local TeamCacheEnemyDAMAGER_MELEE			= TeamCacheEnemy.DAMAGER_MELEE
+--local TeamCacheEnemyDAMAGER_RANGE			= TeamCacheEnemy.DAMAGER_RANGE
 local ActiveUnitPlates						= MultiUnits:GetActiveUnitPlates()
 local ActiveUnitPlatesAny					= MultiUnits:GetActiveUnitPlatesAny()
 	  
@@ -54,18 +70,31 @@ local ALL_HEALS								= HealComm and HealComm.ALL_HEALS
 local CACHE_DEFAULT_TIMER_UNIT				= CONST.CACHE_DEFAULT_TIMER_UNIT
 
 local GameLocale 							= A.FormatGameLocale(_G.GetLocale())	  
-local CombatLogGetCurrentEventInfo			= _G.CombatLogGetCurrentEventInfo	  
+local CombatLogGetCurrentEventInfo			= _G.CombatLogGetCurrentEventInfo or _G.C_CombatLog.GetCurrentEventInfo
 local GetUnitSpeed							= _G.GetUnitSpeed
-local GetSpellInfo							= _G.GetSpellInfo
+local C_Spell								= _G.C_Spell
+local GetSpellName 							= C_Spell and C_Spell.GetSpellName or _G.GetSpellInfo
+local GetSpellInfo							= C_Spell and C_Spell.GetSpellInfo or _G.GetSpellInfo
 local GetPartyAssignment 					= _G.GetPartyAssignment	  
-local UnitIsUnit, UnitPlayerOrPetInRaid, UnitInAnyGroup, UnitPlayerOrPetInParty, UnitInRange, UnitLevel, UnitRace, UnitClass, UnitClassification, UnitExists, UnitIsConnected, UnitIsCharmed, UnitIsGhost, UnitIsDeadOrGhost, UnitIsFeignDeath, UnitIsPlayer, UnitPlayerControlled, UnitCanAttack, UnitIsEnemy, UnitAttackSpeed,
-	  UnitPowerType, UnitPowerMax, UnitPower, UnitName, UnitCanCooperate, UnitCreatureType, UnitCreatureFamily, UnitHealth, UnitHealthMax, UnitGUID, UnitHasIncomingResurrection, UnitIsVisible, UnitDebuff, UnitCastingInfo, UnitChannelInfo =
-	  UnitIsUnit, UnitPlayerOrPetInRaid, UnitInAnyGroup, UnitPlayerOrPetInParty, UnitInRange, UnitLevel, UnitRace, UnitClass, UnitClassification, UnitExists, UnitIsConnected, UnitIsCharmed, UnitIsGhost, UnitIsDeadOrGhost, UnitIsFeignDeath, UnitIsPlayer, UnitPlayerControlled, UnitCanAttack, UnitIsEnemy, UnitAttackSpeed,
-	  UnitPowerType, UnitPowerMax, UnitPower, UnitName, UnitCanCooperate, UnitCreatureType, UnitCreatureFamily, UnitHealth, UnitHealthMax, UnitGUID, UnitHasIncomingResurrection, UnitIsVisible, UnitDebuff, UnitCastingInfo, UnitChannelInfo
-local UnitAura 								= _G.UnitAura	  
-	  
-local UnitThreatSituation					= _G.UnitThreatSituation
-local UnitDetailedThreatSituation			= _G.UnitDetailedThreatSituation
+local UnitIsUnit, UnitPlayerOrPetInRaid, UnitInAnyGroup, UnitPlayerOrPetInParty, UnitInRange, UnitInVehicle, UnitLevel, UnitRace, UnitClass, UnitGroupRolesAssigned, UnitClassification, UnitExists, UnitIsConnected, UnitIsCharmed, UnitIsGhost, UnitIsDeadOrGhost, UnitIsFeignDeath, UnitIsPlayer, UnitPlayerControlled, UnitCanAttack, UnitIsEnemy, UnitAttackSpeed,
+	  UnitPowerType, UnitPowerMax, UnitPower, UnitName, UnitCanCooperate, UnitCreatureType, UnitCreatureFamily, UnitHealth, UnitHealthMax, UnitGetIncomingHeals, UnitGUID, UnitHasIncomingResurrection, UnitIsVisible, UnitGetTotalHealAbsorbs, UnitDebuff, UnitCastingInfo, UnitChannelInfo, UnitStagger =
+	  UnitIsUnit, UnitPlayerOrPetInRaid, UnitInAnyGroup, UnitPlayerOrPetInParty, UnitInRange, UnitInVehicle, UnitLevel, UnitRace, UnitClass, UnitGroupRolesAssigned, UnitClassification, UnitExists, UnitIsConnected, UnitIsCharmed, UnitIsGhost, UnitIsDeadOrGhost, UnitIsFeignDeath, UnitIsPlayer, UnitPlayerControlled, UnitCanAttack, UnitIsEnemy, UnitAttackSpeed,
+	  UnitPowerType, UnitPowerMax, UnitPower, UnitName, UnitCanCooperate, UnitCreatureType, UnitCreatureFamily, UnitHealth, UnitHealthMax, UnitGetIncomingHeals, UnitGUID, UnitHasIncomingResurrection, UnitIsVisible, UnitGetTotalHealAbsorbs, UnitDebuff, UnitCastingInfo, UnitChannelInfo, UnitStagger
+local UnitThreatSituation					= _G.UnitThreatSituation or function(unit, mob) return ThreatLib:UnitThreatSituation(unit, mob) end 
+local UnitDetailedThreatSituation			= _G.UnitDetailedThreatSituation or function(unit, mob) return ThreatLib:UnitDetailedThreatSituation(unit, mob) end 
+local UnitAura 								= _G.UnitAura or _G.C_UnitAuras.GetAuraDataByIndex
+-- Classic: UnitAura override through LibClassicDurations. Only for buffs on other units because debuffs are available since 1.15.
+if BuildToC < 20000 then
+	UnitAura 								= A.UnitAura or TMW.UnitAura or UnitAura
+end
+
+-- Classic
+if LibClassicCasterino then
+	-- To activate it
+	LibClassicCasterino.callbacks.OnUsed() 
+	UnitCastingInfo 						= function(unitID) return LibClassicCasterino:UnitCastingInfo(unitID) end
+	UnitChannelInfo 						= function(unitID) return LibClassicCasterino:UnitChannelInfo(unitID) end
+end
 -------------------------------------------------------------------------------
 -- Remap
 -------------------------------------------------------------------------------
@@ -147,421 +176,2663 @@ local Cache = {
 	end,
 }
 
-local AuraList = {
-    -- CC SCHOOL TYPE 
-    Magic = {         
-		853, 				-- Hammer of Justice 		(Paladin)
-		20066, 				-- Repentance				(Paladin)
-		17390,				-- Faerie Fire (Feral)		(Druid)		
-		2637, 				-- Hibernate 				(Druid)
-		1499, 				-- Freezing Trap			(Hunter)
-		118, 				-- Polymorph				(Mage)
-		851,				-- Polymorph: Sheep 		(Mage)
-		605, 				-- Mind Control 			(Priest)                 
-        8122, 				-- Psychic Scream			(Priest)
-		9484, 				-- Shackle Undead 			(Priest)  				
-		15487, 				-- Silence 					(Priest)
-        5782, 				-- Fear						(Warlock)        
-        6358, 				-- Seduction 				(Warlock)
-        5484, 				-- Howl of Terror        	(Warlock)        
-		710, 				-- Banish 					(Warlock)
-		-- Roots 
-        22519, 				-- Ice Nova 				(Mage)
-        122, 				-- Frost Nova 				(Mage)		
-        339, 				-- Entangling Roots 		(Druid)		
-    },
-    MagicRooted = {
-        22519, 				-- Ice Nova 				(Mage)
-        122, 				-- Frost Nova 				(Mage)		
-        339, 				-- Entangling Roots 		(Druid)
-    }, 
-    Curse = {
-		8277, 				-- Voodoo Hex   			(Shaman) 				-- I AM NOT SURE
-	},
-    --Disease = {},
-    Poison = {
-        24133, 				-- Wyvern Sting 			(Hunter)
-        3034, 				-- Viper Sting 				(Hunter)
-        3043,		 		-- Scorpid Sting 			(Hunter)
-		7992, 				-- Slowing Poison 			(Rogue)
-		3408, 				-- Crippling Poison 		(Rogue)
-    },
-    Physical = {
-		7922, 				-- Charge Stun				(Warrior)
-		676, 				-- Disarm 					(Warrior)
-		5246, 				-- Intimidating Shout		(Warrior)
-		12809,				-- Concussion Blow			(Warrior)
-		20253,				-- Intercept Stun 			(Warrior)
-		5211,				-- Bash						(Druid)
-		9005,				-- Pounce					(Druid)
-		12355,				-- Impact					(Mage, physical effect)
-		19503, 				-- Scatter Shot 			(Hunter)
-		19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
-		19410,				-- Improved Concussive Shot	(Hunter)
-		408, 				-- Kidney Shot 				(Rogue)	
-		1833, 				-- Cheap Shot 				(Rogue)        
-		1776, 				-- Gouge					(Rogue)		
-		6770, 				-- Sap 						(Rogue)
-		2094, 				-- Blind					(Rogue)		        
-		20549, 				-- War Stomp 				(Tauren)	
-		20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?
-		5530,				-- Mace Stun				(Unknown)
-		16922,				-- Starfire Stun			(Unknown)
-   },
-    -- CC CONTROL TYPE
-    Incapacitated = { 
-        1499, 				-- Freezing Trap			(Hunter) 
-        20066, 				-- Repentance				(Paladin)
-		6770, 				-- Sap 						(Rogue)
-        1776, 				-- Gouge					(Rogue)
-		710, 				-- Banish        			(Warlock)
-		22570,				-- Mangle					(Druid)
-    },
-	Fleeing	= {
-		5782, 				-- Fear						(Warlock)
-		5484, 				-- Howl of Terror   		(Warlock)
-		5246, 				-- Intimidating Shout		(Warrior)
-		8122, 				-- Psychic Scream			(Priest)
-	},
-	Shackled = {
-		9484, 				-- Shackle Undead 			(Priest)	
-	},
-	Polymorphed	= {
-		118, 				-- Polymorph				(Mage)
-		851,				-- Polymorph: Sheep 		(Mage)
-		28272,				-- Polymorph: Pig			(Mage)
-		28271,				-- Polymorph: Turtle		(Mage)
-	},
-    Disoriented = {			
-		19503, 				-- Scatter Shot 			(Hunter)		 
-        2094, 				-- Blind					(Rogue)
-    },    
-    Fear = {
-		5782, 				-- Fear						(Warlock)
-		5484, 				-- Howl of Terror   		(Warlock)
-		5246, 				-- Intimidating Shout		(Warrior)
-		6789,				-- Death Coil				(Warlock)
-		8122, 				-- Psychic Scream			(Priest)
-    },
-    Charmed = {
-        605, 				-- Mind Control 			(Priest)                 
-        --9484, 				-- Shackle Undead 			(Priest)
-    },
-    Sleep = {
-		2637, 				-- Hibernate 				(Druid)	
-		19386, 				-- Wyvern Sting 			(Hunter)
-	},
-    Stuned = {
-		7922, 				-- Charge Stun				(Warrior)
-		12809,				-- Concussion Blow			(Warrior)
-		20253,				-- Intercept Stun 			(Warrior)
-		5530,				-- Mace Stun Effect			(Warrior)
-		12798,				-- Revenge Stun				(Warrior)
-		5211,				-- Bash						(Druid)
-		9005,				-- Pounce					(Druid)
-		12355,				-- Impact					(Mage, physical effect)
-		22703,				-- Inferno Effect			(Warlock)
-		18093,				-- Pyroclasm				(Warlock)
-		19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
-		19410,				-- Improved Concussive Shot	(Hunter)
-		853, 				-- Hammer of Justice 		(Paladin)
-		1833, 				-- Cheap Shot 				(Rogue)
-        408, 				-- Kidney Shot 				(Rogue)	
-		20549, 				-- War Stomp 				(Tauren)
-		20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?			
-		16922,				-- Starfire Stun			(Unknown)
-		56,					-- Stun 					(Weapon proc)
-		4067,				-- Big Bronze Bomb
-		4066,				-- Small Bronze Bomb
-		4065,				-- Large Copper Bomb
-		4064,				-- Rough Copper Bomb
-		13808,				-- M73 Frag Grenade
-		19769,				-- Thorium Grenade
-	},
-    PhysStuned = {
-		7922, 				-- Charge Stun				(Warrior)
-		12809,				-- Concussion Blow			(Warrior)
-		20253,				-- Intercept Stun 			(Warrior)
-		5530,				-- Mace Stun Effect			(Warrior)
-		12798,				-- Revenge Stun				(Warrior)
-		5211,				-- Bash						(Druid)
-		9005,				-- Pounce					(Druid)		
-		12355,				-- Impact					(Mage, physical effect)
-		22703,				-- Inferno Effect			(Warlock)
-		18093,				-- Pyroclasm				(Warlock)
-		19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
-		19410,				-- Improved Concussive Shot	(Hunter)
-		1833, 				-- Cheap Shot 				(Rogue)
-        408, 				-- Kidney Shot 				(Rogue)		
-		20549, 				-- War Stomp 				(Tauren)	
-		20685,				-- Storm Bolt	 			(Unknown)				-- FIX ME: Is it useable?		
-		16922,				-- Starfire Stun			(Unknown)		
-		56,					-- Stun 					(Weapon proc)	
-		4067,				-- Big Bronze Bomb
-		4066,				-- Small Bronze Bomb
-		4065,				-- Large Copper Bomb
-		4064,				-- Rough Copper Bomb
-	},
-    Silenced = {
-		15487, 				-- Silence 					(Priest) 
-		18469,				-- Counterspell - Silenced	(Mage)
-		18425,				-- Kick - Silenced			(Rogue)
-		24259,				-- Spell Lock (Felhunter) 	(Warlock)
-		19821,				-- Arcane Bomb
-		18278,				-- Silence (Silent Fang sword)
-	},
-    Disarmed = {
-		676, 				-- Disarm 					(Warrior)
-		14251,				-- Riposte					(Rogue)
-		23365,				-- Dropped Weapon			(Unknown)
-	},
-    Rooted = {
-		23694,				-- Improved Hamstring		(Warrior)
-        22519, 				-- Ice Nova 				(Mage)
-        122, 				-- Frost Nova 				(Mage)	
-		12494,				-- Frostbite				(Mage)	
-        339, 				-- Entangling Roots 		(Druid)
-		19675,				-- Feral Charge Effect		(Druid)
-		19229,				-- Improved Wing Clip 		(Hunter)
-		19185,				-- Entrapment				(Hunter)
-		25999,				-- Boar Charge				(Hunter's pet)		
-    },  
-    Slowed = {		
-        1715, 				-- Hamstring				(Warrior)
-		12323, 				-- Piercing Howl			(Warrior)
-        3408, 				-- Crippling Poison			(Rogue)        
-        7992, 				-- Slowing Poison			(Rogue)
-		2974, 				-- Wing Clip				(Hunter)
-		5116, 				-- Concussive Shot			(Hunter)
-        13496, 				-- Dazed (aka "confuse")	(Druid, Hunter)        
-        17311, 				-- Mind Flay				(Priest)                               
-        2484, 				-- Earthbind				(Shaman)
-        8056, 				-- Frost Shock				(Shaman)
-		8034, 				-- Frostbrand Attack		(Shaman)
-		116, 				-- Frostbolt     			(Mage)
-		120, 				-- Cone of Cold				(Mage)
-        6136, 				-- Chilled 					(Mage)		
-		16094, 				-- Frost Breath 			(Mage)        
-		11113, 				-- Blast Wave				(Mage)
-		3604, 				-- Tendon Rip				(Unknown)
-    },
-    MagicSlowed = {        
-        2484, 				-- Earthbind				(Shaman)
-        8056, 				-- Frost Shock				(Shaman)
-		8034, 				-- Frostbrand Attack		(Shaman)				-- FIX ME: I AM NOT SURE 		
-        6136, 				-- Chilled 					(Mage)	 				-- FIX ME: I AM NOT SURE 
-		16094, 				-- Frost Breath 			(Mage)					-- FIX ME: I AM NOT SURE 
-        120, 				-- Cone of Cold 			(Mage)
-		116, 				-- Frostbolt     			(Mage)
-    },
-    BreakAble = {
-		5246, 				-- Intimidating Shout		(Warrior)
-        20066, 				-- Repentance				(Paladin)		
-		2637, 				-- Hibernate				(Druid)
-		118, 				-- Polymorph				(Mage)
-		851,				-- Polymorph: Sheep 		(Mage)
-		28272,				-- Polymorph: Pig			(Mage)
-		28271,				-- Polymorph: Turtle		(Mage)
-		1499, 				-- Freezing Trap			(Hunter)
-		19386, 				-- Wyvern Sting   			(Hunter)	
-		19503, 				-- Scatter Shot        		(Hunter)
-        6770, 				-- Sap 						(Rogue)
-		2094, 				-- Blind					(Rogue) 
-		1776, 				-- Gouge					(Rogue)
-        5782, 				-- Fear						(Warlock)        
-        6358, 				-- Seduction (pet)			(Warlock)                
-        5484, 				-- Howl of Terror			(Warlock)
-        8122, 				-- Psychic Scream			(Priest)      
-		9484, 				-- Shackle Undead 			(Priest)			
-        -- Rooted CC
-        339, 				-- Entangling Roots			(Druid)
-        122, 				-- Frost Nova				(Mage)
-    },
-    -- Imun Specific Buffs 
-    FearImun = {
-		18499, 				-- Berserker Rage 			(Warrior)
-		12328,				-- Death Wish				(Warrior)
-		1719,				-- Recklessness				(Warrior)
-        8143, 				-- Tremor Totem 			(Shaman)
-		6346,				-- Fear Ward				(Priest)		
-    },
-	FearImunDeBuffs = {
-		704,				-- Curse of Recklessness 	(Warlock)
-	},
-    StunImun = {
-        6615, 				-- Free Action 				(Free Action Potion)
-		24364,				-- Living Free Action		(Potion)
-        1953, 				-- Blink (micro buff)		(Mage)
-    },        
-    Freedom = {
-		6615, 				-- Free Action 				(Free Action Potion)
-		1044, 				-- Blessing of Freedom		(Paladin)
-		24364,				-- Living Free Action		(Potion)
-	},
-    TotalImun = {
-		710, 				-- Banish 					(Warlock)
-		498, 				-- Divine Protection		(Paladin)
-        642, 				-- Divine Shield			(Paladin)		
-        11958, 				-- Ice Block				(Mage)
-        19263, 				-- Deterrence    			(Hunter)
-        20711, 				-- Spirit of Redemption		(Priest)
-		17624,				-- Petrification			(Flask of Petrification)
-    },
-    DamagePhysImun = {		
-		1022, 				-- Blessing of Protection	(Paladin)
-		3169,				-- Invulnerability			(Limited Invulnerability Potion)
-		--16621,			-- Self Invulnerability (Invulnerable Mail weapon) -- FIX ME: seems only for swing attacks
-	},
-    DamageMagicImun = {}, 
-    CCTotalImun = {},     
-    CCMagicImun = {
-		8178,				-- Grounding Totem Effect	(Shaman)
-	},
-    Reflect = { 
-        8178, 				-- Grounding Totem Effect	(Shaman)
-        23131, 				-- Frost Reflector			(Item)
-        23132, 				-- Shadow Reflector			(Item)
-        23097, 				-- Fire Reflector			(Item)
-    }, 
-    KickImun = {},
-    -- Purje 
-    ImportantPurje = {
-        1022, 				-- Blessing of Protection	(Paladin)
-        20216, 				-- Divine Favor 			(Paladin)		
-        11129, 				-- Combustion 				(Mage)
-        12042, 				-- Arcane Power 			(Mage)
-        10060, 				-- Power Infusion			(Priest)
-		29166,				-- Innervate				(Druid)
-		2645, 				-- Ghost Wolf 				(Shaman)
-		16166, 				-- Elemental Mastery		(Shaman)
-		17730,				-- Major Spellstone			(Warlock)
-		17729,				-- Greater Spellstone		(Warlock)
-		128,				-- Spellstone				(Warlock)
-		18708,				-- Fel Domination			(Warlock)
-		18288,				-- Amplify Curse			(Warlock)		
-    },
-    SecondPurje = {
-        1044, 				-- Blessing of Freedom      (Paladin)  
-        -- We need purje druid only in bear form 
-		467,				-- Thorns					(Druid)
-        774, 				-- Rejuvenation				(Druid)
-        8936, 				-- Regrowth 				(Druid)
-        1126, 				-- Mark of the Wild			(Druid)
-    },
-    -- Speed 
-    Speed = {
-        2983, 				-- Sprint 					(Rogue)
-        2379, 				-- Speed 					(Swiftness Potion)
-        2645, 				-- Ghost Wolf 				(Shaman)
-		1850, 				-- Dash 					(Druid)
-		5118, 				-- Aspect of the Cheetah	(Hunter)       
-    },
-    -- Deff 
-    DeffBuffsMagic = {
-		8178, 				-- Grounding Totem Effect	(Shaman)
-		--498, 					-- Divine Protection		(Paladin)
-        --642, 					-- Divine Shield			(Paladin)
-        --11958, 				-- Ice Block				(Mage)
-        --19263, 				-- Deterrence    			(Hunter)
-        --20711, 				-- Spirit of Redemption		(Priest)		
-    }, 
-    DeffBuffs = {        
-		871,				-- ShieldWall				(Warrior)
-		20230,				-- Retaliation				(Warrior)
-		5277, 				-- Evasion					(Rogue)
-		1022, 				-- Blessing of Protection	(Paladin)
-		22812,				-- Barkskin					(Druid)
-		3169,				-- Invulnerability			(Limited Invulnerability Potion)
-		--498, 					-- Divine Protection		(Paladin)
-        --642, 					-- Divine Shield			(Paladin)
-        --11958, 				-- Ice Block				(Mage)
-        --19263, 				-- Deterrence    			(Hunter)
-        --20711, 				-- Spirit of Redemption		(Priest)		
-    },  
-	SmallDeffBuffs = {
-		20594,				-- Stoneform				(Dwarf)
-		6940, 				-- Blessing of Sacrifice	(Paladin)
-	},
-    -- Damage buffs / debuffs
-    Rage = {
-        18499, 				-- Berserker Rage (Warrior)
-        12880, 				-- Enrage (Warrior)
-    }, 
-    DamageBuffs = {        
-		12328,				-- Death Wish 				(Warrior)		
-		1719,				-- Recklessness				(Warrior)
-		13877,				-- Blade Flurry				(Rogue)
-		13750,				-- Adrenaline Rush			(Rogue)
-		19574,				-- Bestial Wrath			(Hunter)
-		11129, 				-- Combustion 				(Mage)
-		12042, 				-- Arcane Power 			(Mage)
-		26297,				-- Berserking				(Troll)
-		20572,				-- Blood Fury				(Orc)
-    },
-    DamageBuffs_Melee = {        
-		12328,				-- Death Wish 				(Warrior)	
-		1719,				-- Recklessness				(Warrior)
-        13750,				-- Adrenaline Rush			(Rogue)
-		13877,				-- Blade Flurry				(Rogue)		
-    },
-    BurstHaste = {
-        19372, 				-- Ancient Hysteria 		(Unknown)
-        24185, 				-- Bloodlust 				(Unknown)
-    },
-    -- SOME SPECIAL
-    --DamageDeBuffs = {}, 
-    Flags = {
-        301091, 			-- Alliance flag
-        301089,  			-- Horde flag 
-		23333,				-- Warsong Flag
-        23335,  			-- Silverwing Flag
-    }, 
-    -- Cast Bars
-    Reshift = {
-        {118, 30}, 			-- Polymorph 				(Mage)
-        {19386, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
-    },
-    Premonition = {
-        {118, 30}, 			-- Polymorph 				(Mage)
-		{851, 20},			-- Polymorph: Sheep 		(Mage)
-		{28272, 30},		-- Polymorph: Pig	 		(Mage)
-		{28271, 30},		-- Polymorph: Turtle 		(Mage)
-        {24133, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
-		{5782, 20}, 		-- Fear 					(Warlock)        
-    },
-    CastBarsCC = {
-        118, 				-- Polymorph 				(Mage)
-		851,				-- Polymorph: Sheep 		(Mage)
-        20066, 				-- Repentance 				(Paladin)
-        24133, 				-- Wyvern Sting 			(Hunter)
-        5782, 				-- Fear 					(Warlock) 
-		5484, 				-- Howl of Terror   		(Warlock)
-        605, 				-- Mind Control 			(Priest)                 
-        9484, 				-- Shackle Undead 			(Priest) 
-    },
-    AllPvPKickCasts = {    
-        118, 				-- Polymorph 				(Mage)
-		851,				-- Polymorph: Sheep 		(Mage)
-		635,				-- Holy Light				(Paladin)
-		19750,				-- Flash of Light			(Paladin)
-        20066, 				-- Repentance 				(Paladin)		
-		5782, 				-- Fear 					(Warlock) 
-        19386, 				-- Wyvern Sting 			(Hunter)       
-        982, 				-- Revive Pet 				(Hunter)
-		605, 				-- Mind Control 			(Priest)  
-		9484, 				-- Shackle Undead 			(Priest) 
-        4526, 				-- Mass Dispel 				(Priest)	
-		596, 				-- Prayer of Healing		(Priest)
-		2060,				-- Greater Heal				(Priest)
-		2061,				-- Flash Heal				(Priest)
-		740, 				-- Tranquility				(Druid)
-        20484, 				-- Rebirth					(Druid)
-		25297,				-- Healing Touch			(Druid)
-		8936, 				-- Regrowth 				(Druid)
-		331,				-- Healing Wave				(Shaman)
-		1064,				-- Chain Heal				(Shaman)
-    },    
-}
+local AuraList
+if BuildToC >= 50000 then
+	AuraList = {
+		-- CC SCHOOL TYPE 
+		Magic = {
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			11446, -- Mind Control                
+			10955, -- Shackle Undead
+			20066, -- Repentance          
+			60192, -- Freezing Arrow (hunter pvp)        
+			6358, -- Seduction
+			47860, -- Death Coil
+			31661, -- Dragon's Breath
+			15487, -- Silence        
+			48827, -- Avenger's Shield
+			49916, -- Strangulate
+			49203, -- Hungering Cold (DK frost talent)
+			47843, -- Unstable Affliction
+			10308, -- Hammer of Justice
+			64044, -- Psychic Horror
+			47847, -- Shadowfury
+			1122, -- Summon Infernal (Inferno)
+			59672, -- Metamorphosis (Demonology)
+		},
+		MagicRooted = {
+			53313, -- Entangling Roots
+			42917, -- Frost Nova
+			45524, -- Chains of Ice
+		}, 
+		Curse = {
+			51514, -- Hex   
+			11719, -- Curse of Tongues
+			50511, -- Curse of Weakness
+		},
+		Disease = {
+			196782, -- Outbreak (5 sec infecting dot)
+			191587, -- Outbreak (21+ sec dot)
+			48483, 48484, 48485, -- Infected Wounds (Feral slow)
+			59879, -- Blood Plague
+			59921, -- Frost Fever
+		},
+		Poison = {
+			3034, -- Viper Sting
+			3043, -- Scorpid Sting
+		},
+		Physical = {
+			5246, -- Intimidating Shout
+			2094, -- Blind
+			19503, -- Scatter Shot (hunter pvp talent)
+			1833, -- Cheap Shot
+			8643, -- Kidney Shot
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			19577, -- Intimidation
+			49803, -- Pounce
+			199804, -- Between the Eyes
+			49802, -- Maim
+			47481, -- Gnaw (DK pet)
+			51722, -- Dismantle
+			676, -- Disarm        
+			46968, -- Shockwave
+			20549, -- War Stomp
+		},
+		-- CC CONTROL TYPE
+		CrowdControl = {
+			-- Deprecated
+		},
+		Incapacitated = {
+			-- Druid
+			49802, -- Maim (Feral PvP talent)
+			-- Hunter 
+			19503, -- Scatter Shot 
+			60192, -- Freezing Arrow (hunter pvp)  
+			-- Mage 
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey) 
+			-- Paladin 
+			20066, -- Repentance 
+			-- Priest 
+			10955, -- Shackle Undead
+			-- Shaman		
+			51514, -- Hex (also 211004, 210873, 211015, 211010)   
+			-- Warlock 
+			710, 18647, -- Banish
+		},
+		Disoriented = {
+			-- Death Knight
+			-- Druid 
+			33786, -- Cyclone 
+			-- Hunter
+			-- Mage 
+			31661, -- Dragon's Breath (Fire)
+			-- Paladin 
+			-- Priest
+			-- 226943, -- Mind Bomb
+			-- Rogue 
+			2094, -- Blind		
+			-- Warlock
+			115268, -- Mesmerize (Shivarra)
+			6358, -- Seduction (Succubus)
+			-- Warrior
+			5246, -- Intimidating Shout
+		},    
+		Fear = {
+			5246, -- Intimidating Shout
+		},
+		Charmed = {
+			-- Deprecated
+			11446, -- Mind Control                  
+			10955, -- Shackle Undead
+		},
+		Sleep = {
+		},
+		Stuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			49203, -- Hungering Cold
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Paladin 
+			10308, -- Hammer of Justice
+			-- Priest 
+			64044, -- Psychic Horror
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Warlock 
+			47847, -- Shadowfury
+			-- 89766, -- Axe Toss (pet)
+			1122, -- Summon Infernal (Inferno)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+			-- Kul Tiran
+		},
+		PhysStuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			-- Druid 
+			49802, -- Maim
+			-- 163505, -- Rake
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+		},
+		Silenced = {
+			-- Death Knight 
+			49916, -- Strangulate (Unholy/Blood)
+			-- Hunter 
+			34490, -- Silencing Shot
+			-- Paladin 
+			48827, -- Avenger's Shield	(Prot)	
+			-- Priest 
+			15487, -- Silence (Shadow)    
+			-- Rogue 		
+			1330, -- Garrote - Silence				
+			-- Warlock         
+			31117, -- Unstable Affliction -- Not 100% sure
+		},
+		Disarmed = {
+			-- Rogue 
+			51722, -- Dismantle
+			-- Warrior 
+			676, -- Disarm  
+		}, 
+		Rooted = {
+			53313, -- Entangling Roots Dispel able 
+			64695, -- Earthgrab
+			51485, -- Storm earth and fire
+			42917, -- Frost Nova
+			33395, -- Freeze (frost mage water elemental)
+			45334, -- Immobilized (wild charge, bear form) 
+			12289, 12668, 23695, -- Improved Hamstring (r1,2,3)     
+			19185, 64803, 64804, -- Entrapment (r1&2&3)
+			55509, -- Venom Web Spray (Hunter pet)
+		},  
+		Slowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold
+			42945, -- Blast Wave
+			1715, -- Hamstring
+			3775, -- Crippling Poison
+			3600, -- Earthbind
+			5116, -- Concussive Shot
+			7301, -- Frost Armor
+			48674, -- Deadly Throw
+			45524, -- Chains of Ice
+			50259, -- Dazed (Wild Charge, druid talent, cat form)
+			53227, -- Typhoon
+			12323, -- Piercing Howl
+			71647, -- Ice Trap
+			48156, -- Mind Flay
+			31589, -- Slow
+			48483, 48484, 48485, -- Infected Wounds
+			64186, -- Frostbrand Attack
+			53575, -- Tendon Rip (Hunter pet)
+			2974, -- Wing Clip
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			55741, 68766, -- Desecration (DK unholy talent)
+			50040, 50041, 50043, -- Chilblains (DK frost talent r1,2,3)
+			42931, -- Cone of Cold (frost mage)
+			53407, -- Judgement of Justice
+		},
+		MagicSlowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold       
+			3600, -- Earthbind
+			7301, -- Frost Armor
+			53227, -- Typhoon
+			64186, -- Frostbrand Attack
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			42931, -- Cone of Cold (frost mage)
+		},
+		BreakAble = {
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			20066, -- Repentance
+			51514, -- Hex
+			60192, -- Freezing Arrow
+			6358, -- Seduction
+			2094, -- Blind
+			5246, -- Intimidating Shout
+			31661, -- Dragon's Breath
+			19503, -- Scatter Shot        
+			-- Rooted CC
+			--53313, -- Entangling Roots
+			--42917, -- Frost Nova
+		},
+		-- Imun Specific Buffs 
+		FearImun = {
+			34692, -- The Beast Within (Hunter BM PvP)
+			49039, -- Lichborne
+			8143, -- Tremor Totem 
+		},
+		StunImun = {
+			48792, -- Icebound Fortitude
+			6615, -- Free Action (Potion)
+			1953, -- Blink (micro buff)
+			46924, -- Bladestorm
+		},        
+		Freedom = {
+			1044, -- Hand of Freedom
+			46924, -- Bladestorm
+			53271, -- Master's Call    
+		},
+		TotalImun = {
+			710, 18647, -- Banish
+			642, -- Divine Shield
+			45438, -- Ice Block
+			20711, -- Spirit of Redemption
+		},
+		DamagePhysImun = {
+			10278, -- Hand of Protection
+			642, -- Bubble
+		},    
+		DamageMagicImun = {    -- When we can't totally damage    
+			31224, -- Cloak of Shadows
+		}, 
+		CCTotalImun = {
+			46924, -- Bladestorm   
+		},     
+		CCMagicImun = {
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+		}, 
+		Reflect = {            -- Only to cancel reflect effect  
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+
+		}, 
+		KickImun = { -- Imun Silence too
+			31821, -- Aura mastery
+		},
+		-- Purje 
+		ImportantPurje = {
+			10278, -- Hand of Protection
+			11129, -- Combustion 
+			10060, -- Power Infusion
+			12042, -- Arcane Power 
+			12472, -- Icy Veins
+			20216, -- Divine Favor 
+		},
+		SecondPurje = {
+			1044, -- Hand of Freedom      
+			-- We need purje druid only in bear form 
+			48451, -- Lifebloom
+			48441, -- Rejuvenation
+			-- 155777, -- Rejuvenation (Germination)
+			53251, -- Wild Growth    
+			48443, -- Regrowth
+			48469, 48470, -- Mark of the Wild & Gift of the Wild
+		},
+		PvEPurje = {
+			197797, 210662, 211632, 209033, 198745, 194615, 282098, 301629, 297133, 266201, 258938, 268709, 268375, 274210, 276265,
+		},
+		-- Speed 
+		Speed = {
+			11305, -- Sprint
+			2379, -- Speed (Swiftness Potion)
+			2645, -- Ghost Wolf
+			7840, -- Swim Speed (Swim Speed Potion)
+			36554, -- Shadowstep
+			54861, -- Nitro Boosts
+			-- 58875, -- Spirit Walk
+			64127, 64129, -- Body and Soul (r1,2)
+			-- 68992, -- Darkflight
+			-- 85499, -- Speed of Light
+			-- 87023, -- Cauterize
+			31641, 31642, -- Blazing Speed (r1,2)
+			33357, -- Dash
+			-- 77761, -- Stampeding Roar
+			-- 111400, -- Burning Rush
+			-- 116841, -- Tiger's Lust
+			-- 118922, -- Posthaste
+			-- 119085, -- Chi Torpedo
+			-- 121557, -- Angelic Feather
+			-- 137452, -- Displacer Beast
+			-- 137573, -- Burst of Speed
+			-- 192082, -- Wind Rush (shaman wind rush totem talent)
+			-- 196674, -- Planewalker (warlock artifact trait)
+			-- 197023, -- Cut to the chase (rogue pvp talent)
+			-- 199407, -- Light on your feet (mistweaver monk artifact trait)
+			-- 201233, -- whirling kicks (windwalaker monk pvp talent)
+			-- 201447, -- Ride the wind (windwalaker monk pvp talent)
+			-- 209754, -- Boarding Party (rogue pvp talent)
+			-- 210980, -- Focus in the light (holy priest artifact trait)
+			-- 213177, -- swift as a coursing river (brewmaster artifact trait)
+			-- 214121, -- Body and Mind (priest talent)
+			-- 215572, -- Frothing Berserker (warrior talent)
+			-- 231390, -- Trailblazer (hunter talent)
+			5118, 13159,  -- Aspect of the Cheetah & Aspect of the Pack
+			-- 204475, -- Windburst (marks hunter artifact ability)        
+		},
+		-- Deff 
+		DeffBuffsMagic = {
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender 
+			64205, -- Divine Sacrifice 
+			53527, -- Divine Guardian
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword 
+			-- 104773, -- Unending Resolve        
+			-- 108271, -- Astral Shift
+			6940, -- Hand of Sacrifice
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+			-- 213915, -- Mass reflect
+			-- 212295, -- Nether Ward (Warlock)
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			-- 122278, -- Dampen Harm 
+			61336, -- Survival Instincts -- Believe this is physical?
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 204018, -- Blessing of Spellwarding
+			-- 196555, -- Netherwalk
+			-- 206803, -- Rain from Above
+		}, 
+		DeffBuffs = {        
+			-- 76577, -- Smoke Bomb
+			-- 53480, -- Road of Sacriface
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender        
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword        
+			-- 104773, -- Unending Resolve
+			6940, -- Hand of Sacrifice
+			-- 108271, -- Astral Shift
+			30823, -- Shamanistic Rage
+			26669, -- Evasion
+			22812, -- Ironbark
+			10278, -- Hand of Protection
+			-- 74001, -- Combat Readiness
+			31224, -- Cloak of Shadows
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			48792, -- Icebound Fortitude
+			49222, -- Bone Shield (DK UH talent)
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			498, -- Divine Protection
+			-- 157913, -- Evanesce
+			-- 115203, -- Fortifying Brew
+			22812, -- Barkskin
+			-- 122278, -- Dampen Harm        
+			61336, -- Survival Instincts
+			22842, -- Frenzied Regeneration
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 198589, -- Blur    
+			-- 196555, -- Netherwalk
+			-- 243435, -- Fortifying Brew
+			-- 206803, -- Rain from Above
+		},    
+		-- Damage buffs / debuffs
+		Rage = {
+			18499, -- Berserker Rage
+			12880, 14201, 14202, 14203, 14204, -- Enrage (Fury talent r1,2,3,4,5)
+			12292, -- Death Wish
+		}, 
+		DamageBuffs = {        
+			51690, -- Killing Spree
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			59672, -- Metamorphosis (demonology)
+			34692, -- The Beast Within 
+			3045, -- Rapid Fire
+			53434, -- Call of the Wild (Hunter pet)
+			1719, -- Recklessness
+			-- 193530, -- Aspect of the Wild (small burst)
+			-- 266779, -- Coordinated Assault
+			-- 193526, -- Trueshot
+			50213, -- Tiger's Fury (small burst)
+			50334, -- Berserk 
+			-- 102560, -- Incarnation: Chosen of Elune
+			-- 102543, -- Incarnation: King of the Jungle
+			11129, -- Combustion 
+			12042, -- Arcane Power                
+			12472, -- Icy Veins
+			12043, -- Presence of Mind (magic)
+			55342, -- Mirror Image
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			16166, -- Elemental Mastery 
+			-- 113858, -- Dark Soul: Instability
+			-- 267217, -- Nether Portal
+			-- 113860, -- Dark Soul: Misery
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+			51271, -- Pillar of Frost
+			85696, -- Zealotry
+			85730, -- Deadly Calm
+			77801, -- Demon Soul
+		},
+		DamageBuffs_Melee = {        
+			51690, -- Killing Spree
+			-- 121471, -- Shadow of Blades
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			1719, -- Recklessness
+			12292, -- Death Wish
+			-- 59672, -- Metamorphosis (demonology)
+			-- 266779, -- Coordinated Assault
+			50334, -- Berserk 
+			102543, -- Incarnation: King of the Jungle
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+			51271, -- Pillar of Frost
+			85696, -- Zealotry
+			85730, -- Deadly Calm		
+		},
+		BurstHaste = {
+			-- 90355, -- Ancient Hysteria
+			-- 146555, -- Drums of Rage
+			-- 178207, -- Drums of Fury
+			-- 230935, -- Drums of the Mountain
+			2825, -- Bloodlust
+			-- 80353, -- Time Warp
+			-- 160452, -- Netherwinds
+			32182, -- Heroism
+		},
+		-- SOME SPECIAL
+		DamageDeBuffs = {
+			-- 79140, -- Vendetta (debuff)
+			-- 115080, -- Touhc of Death (debuff)
+			-- 122470, -- KARMA
+		}, 
+		Flags = {
+			301091, -- Alliance flag
+			301089,  -- Horde flag 
+			34976,  -- Netherstorm Flag
+			-- 121164, -- Orb of Power
+		}, 
+		-- Cast Bars
+		Reshift = {
+			{118, 45}, -- Polymorph (45 coz of blink available)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+			-- {19386, 40}, -- Wyvern Sting
+		},
+		Premonition = {
+			-- {113724, 30}, -- Ring of Frost 
+			{118, 45}, -- Polymorph (45 coz of blink available while cast)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+		},
+		CastBarsCC = {
+			-- 113724, -- Ring of Frost
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			-- 20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting
+			33786, -- Cyclone
+			11446, -- Mind Control   
+		},
+		AllPvPKickCasts = {    
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting -- Instant in wrath
+			33786, -- Cyclone
+			11446, -- Mind Control 
+			982, -- Revive Pet 
+			32375, -- Mass Dispel 
+			-- 203286, -- Greatest Pyroblast
+			59172, -- Chaos Bolt 
+			48477, -- Rebirth
+			-- 203155, -- Sniper Shot 
+			53007, -- Penance
+			48072, -- Prayer of Healing
+			6064, -- Heal
+			48070, -- Flash Heal
+			48120, -- Binding Heal                        (priest, holy)
+			-- 48113, -- Prayer of Mending (Instant in wrath)
+			64843, -- Divine Hymn
+			-- 120517, -- Halo                                (priest, holy/disc)
+			33247, -- Shadow Mend
+			-- 194509, -- Power Word: Radiance
+			-- 265202, -- Holy Word: Salvation                (priest, holy)
+			48063, -- Greater Heal                        (priest, holy)
+			48447, -- Tranquility
+			48443, -- Regrowth
+			-- 53251, -- Wild Growth -- Instant in wrath
+			50464, -- Nourish                             (druid, restoration)
+			55459, -- Chain Heal
+			-- 8004, -- Healing Surge
+			-- 73920, -- Healing Rain
+			49273, -- Healing Wave
+			49276, -- Lesser Healing Wave
+			-- 197995, -- Wellspring                          (shaman, restoration)
+			-- 207778, -- Downpour                            (shaman, restoration)
+			48785, -- Flash of Light
+			48782, -- Holy Light
+			-- 116670, -- Vivify
+			-- 124682, -- Enveloping Mist
+			-- 191837, -- Essence Font
+			-- 209525, -- Soothing Mist
+			-- 227344, -- Surging Mist                        (monk, mistweaver)
+		},    
+	}
+elseif BuildToC >= 40000 then
+	AuraList = {
+		-- CC SCHOOL TYPE 
+		Magic = {
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			11446, -- Mind Control                
+			10955, -- Shackle Undead
+			20066, -- Repentance          
+			60192, -- Freezing Arrow (hunter pvp)        
+			6358, -- Seduction
+			47860, -- Death Coil
+			31661, -- Dragon's Breath
+			15487, -- Silence        
+			48827, -- Avenger's Shield
+			49916, -- Strangulate
+			49203, -- Hungering Cold (DK frost talent)
+			47843, -- Unstable Affliction
+			10308, -- Hammer of Justice
+			64044, -- Psychic Horror
+			47847, -- Shadowfury
+			1122, -- Summon Infernal (Inferno)
+			59672, -- Metamorphosis (Demonology)
+		},
+		MagicRooted = {
+			53313, -- Entangling Roots
+			42917, -- Frost Nova
+			45524, -- Chains of Ice
+		}, 
+		Curse = {
+			51514, -- Hex   
+			11719, -- Curse of Tongues
+			50511, -- Curse of Weakness
+		},
+		Disease = {
+			196782, -- Outbreak (5 sec infecting dot)
+			191587, -- Outbreak (21+ sec dot)
+			48483, 48484, 48485, -- Infected Wounds (Feral slow)
+			59879, -- Blood Plague
+			59921, -- Frost Fever
+		},
+		Poison = {
+			3034, -- Viper Sting
+			3043, -- Scorpid Sting
+		},
+		Physical = {
+			5246, -- Intimidating Shout
+			13741, 13793, -- Improved Gouge
+			2094, -- Blind
+			19503, -- Scatter Shot (hunter pvp talent)
+			1833, -- Cheap Shot
+			8643, -- Kidney Shot
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			19577, -- Intimidation
+			49803, -- Pounce
+			199804, -- Between the Eyes
+			49802, -- Maim
+			47481, -- Gnaw (DK pet)
+			51722, -- Dismantle
+			676, -- Disarm        
+			46968, -- Shockwave
+			20549, -- War Stomp
+		},
+		-- CC CONTROL TYPE
+		CrowdControl = {
+			-- Deprecated
+		},
+		Incapacitated = {
+			-- Druid
+			49802, -- Maim (Feral PvP talent)
+			-- Hunter 
+			19503, -- Scatter Shot 
+			60192, -- Freezing Arrow (hunter pvp)  
+			-- Mage 
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey) 
+			-- Paladin 
+			20066, -- Repentance 
+			-- Priest 
+			10955, -- Shackle Undead
+			-- Rogue 
+			13741, 13793, -- Improved Gouge	
+			-- Shaman		
+			51514, -- Hex (also 211004, 210873, 211015, 211010)   
+			-- Warlock 
+			710, 18647, -- Banish
+		},
+		Disoriented = {
+			-- Death Knight
+			-- Druid 
+			33786, -- Cyclone 
+			-- Hunter
+			-- Mage 
+			31661, -- Dragon's Breath (Fire)
+			-- Paladin 
+			-- Priest
+			-- 226943, -- Mind Bomb
+			-- Rogue 
+			2094, -- Blind		
+			-- Warlock
+			115268, -- Mesmerize (Shivarra)
+			6358, -- Seduction (Succubus)
+			-- Warrior
+			5246, -- Intimidating Shout
+		},    
+		Fear = {
+			5246, -- Intimidating Shout
+		},
+		Charmed = {
+			-- Deprecated
+			11446, -- Mind Control                  
+			10955, -- Shackle Undead
+		},
+		Sleep = {
+		},
+		Stuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			49203, -- Hungering Cold
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Paladin 
+			10308, -- Hammer of Justice
+			-- Priest 
+			64044, -- Psychic Horror
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Warlock 
+			47847, -- Shadowfury
+			-- 89766, -- Axe Toss (pet)
+			1122, -- Summon Infernal (Inferno)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+			-- Kul Tiran
+		},
+		PhysStuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			-- Druid 
+			49802, -- Maim
+			-- 163505, -- Rake
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+		},
+		Silenced = {
+			-- Death Knight 
+			49916, -- Strangulate (Unholy/Blood)
+			-- Hunter 
+			34490, -- Silencing Shot
+			-- Paladin 
+			48827, -- Avenger's Shield	(Prot)	
+			-- Priest 
+			15487, -- Silence (Shadow)    
+			-- Rogue 		
+			1330, -- Garrote - Silence				
+			-- Warlock         
+			31117, -- Unstable Affliction -- Not 100% sure
+		},
+		Disarmed = {
+			-- Rogue 
+			51722, -- Dismantle
+			-- Warrior 
+			676, -- Disarm  
+		}, 
+		Rooted = {
+			53313, -- Entangling Roots Dispel able 
+			64695, -- Earthgrab
+			51485, -- Storm earth and fire
+			42917, -- Frost Nova
+			33395, -- Freeze (frost mage water elemental)
+			45334, -- Immobilized (wild charge, bear form) 
+			12289, 12668, 23695, -- Improved Hamstring (r1,2,3)     
+			19185, 64803, 64804, -- Entrapment (r1&2&3)
+			55509, -- Venom Web Spray (Hunter pet)
+		},  
+		Slowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold
+			42945, -- Blast Wave
+			1715, -- Hamstring
+			3775, -- Crippling Poison
+			3600, -- Earthbind
+			5116, -- Concussive Shot
+			7301, -- Frost Armor
+			48674, -- Deadly Throw
+			45524, -- Chains of Ice
+			50259, -- Dazed (Wild Charge, druid talent, cat form)
+			53227, -- Typhoon
+			12323, -- Piercing Howl
+			71647, -- Ice Trap
+			48156, -- Mind Flay
+			31589, -- Slow
+			48483, 48484, 48485, -- Infected Wounds
+			64186, -- Frostbrand Attack
+			53575, -- Tendon Rip (Hunter pet)
+			2974, -- Wing Clip
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			55741, 68766, -- Desecration (DK unholy talent)
+			50040, 50041, 50043, -- Chilblains (DK frost talent r1,2,3)
+			42931, -- Cone of Cold (frost mage)
+			53407, -- Judgement of Justice
+		},
+		MagicSlowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold       
+			3600, -- Earthbind
+			7301, -- Frost Armor
+			53227, -- Typhoon
+			64186, -- Frostbrand Attack
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			42931, -- Cone of Cold (frost mage)
+		},
+		BreakAble = {
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			20066, -- Repentance
+			51514, -- Hex
+			60192, -- Freezing Arrow
+			6358, -- Seduction
+			2094, -- Blind
+			5246, -- Intimidating Shout
+			13741, 13793, -- Improved Gouge
+			31661, -- Dragon's Breath
+			19503, -- Scatter Shot        
+			-- Rooted CC
+			--53313, -- Entangling Roots
+			--42917, -- Frost Nova
+		},
+		-- Imun Specific Buffs 
+		FearImun = {
+			34692, -- The Beast Within (Hunter BM PvP)
+			49039, -- Lichborne
+			8143, -- Tremor Totem 
+		},
+		StunImun = {
+			48792, -- Icebound Fortitude
+			6615, -- Free Action (Potion)
+			1953, -- Blink (micro buff)
+			46924, -- Bladestorm
+		},        
+		Freedom = {
+			1044, -- Hand of Freedom
+			46924, -- Bladestorm
+			53271, -- Master's Call    
+		},
+		TotalImun = {
+			710, 18647, -- Banish
+			642, -- Divine Shield
+			45438, -- Ice Block
+			20711, -- Spirit of Redemption
+		},
+		DamagePhysImun = {
+			10278, -- Hand of Protection
+			642, -- Bubble
+		},    
+		DamageMagicImun = {    -- When we can't totally damage    
+			31224, -- Cloak of Shadows
+		}, 
+		CCTotalImun = {
+			46924, -- Bladestorm   
+		},     
+		CCMagicImun = {
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+		}, 
+		Reflect = {            -- Only to cancel reflect effect  
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+
+		}, 
+		KickImun = { -- Imun Silence too
+			31821, -- Aura mastery
+		},
+		-- Purje 
+		ImportantPurje = {
+			10278, -- Hand of Protection
+			11129, -- Combustion 
+			10060, -- Power Infusion
+			12042, -- Arcane Power 
+			12472, -- Icy Veins
+			20216, -- Divine Favor 
+		},
+		SecondPurje = {
+			1044, -- Hand of Freedom      
+			-- We need purje druid only in bear form 
+			48451, -- Lifebloom
+			48441, -- Rejuvenation
+			-- 155777, -- Rejuvenation (Germination)
+			53251, -- Wild Growth    
+			48443, -- Regrowth
+			48469, 48470, -- Mark of the Wild & Gift of the Wild
+		},
+		PvEPurje = {
+			197797, 210662, 211632, 209033, 198745, 194615, 282098, 301629, 297133, 266201, 258938, 268709, 268375, 274210, 276265,
+		},
+		-- Speed 
+		Speed = {
+			11305, -- Sprint
+			2379, -- Speed (Swiftness Potion)
+			2645, -- Ghost Wolf
+			7840, -- Swim Speed (Swim Speed Potion)
+			36554, -- Shadowstep
+			54861, -- Nitro Boosts
+			-- 58875, -- Spirit Walk
+			64127, 64129, -- Body and Soul (r1,2)
+			-- 68992, -- Darkflight
+			-- 85499, -- Speed of Light
+			-- 87023, -- Cauterize
+			31641, 31642, -- Blazing Speed (r1,2)
+			33357, -- Dash
+			-- 77761, -- Stampeding Roar
+			-- 111400, -- Burning Rush
+			-- 116841, -- Tiger's Lust
+			-- 118922, -- Posthaste
+			-- 119085, -- Chi Torpedo
+			-- 121557, -- Angelic Feather
+			-- 137452, -- Displacer Beast
+			-- 137573, -- Burst of Speed
+			-- 192082, -- Wind Rush (shaman wind rush totem talent)
+			-- 196674, -- Planewalker (warlock artifact trait)
+			-- 197023, -- Cut to the chase (rogue pvp talent)
+			-- 199407, -- Light on your feet (mistweaver monk artifact trait)
+			-- 201233, -- whirling kicks (windwalaker monk pvp talent)
+			-- 201447, -- Ride the wind (windwalaker monk pvp talent)
+			-- 209754, -- Boarding Party (rogue pvp talent)
+			-- 210980, -- Focus in the light (holy priest artifact trait)
+			-- 213177, -- swift as a coursing river (brewmaster artifact trait)
+			-- 214121, -- Body and Mind (priest talent)
+			-- 215572, -- Frothing Berserker (warrior talent)
+			-- 231390, -- Trailblazer (hunter talent)
+			5118, 13159,  -- Aspect of the Cheetah & Aspect of the Pack
+			-- 204475, -- Windburst (marks hunter artifact ability)        
+		},
+		-- Deff 
+		DeffBuffsMagic = {
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender 
+			64205, -- Divine Sacrifice 
+			53527, -- Divine Guardian
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword 
+			-- 104773, -- Unending Resolve        
+			-- 108271, -- Astral Shift
+			6940, -- Hand of Sacrifice
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+			-- 213915, -- Mass reflect
+			-- 212295, -- Nether Ward (Warlock)
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			-- 122278, -- Dampen Harm 
+			61336, -- Survival Instincts -- Believe this is physical?
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 204018, -- Blessing of Spellwarding
+			-- 196555, -- Netherwalk
+			-- 206803, -- Rain from Above
+		}, 
+		DeffBuffs = {        
+			-- 76577, -- Smoke Bomb
+			-- 53480, -- Road of Sacriface
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender        
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword        
+			-- 104773, -- Unending Resolve
+			6940, -- Hand of Sacrifice
+			-- 108271, -- Astral Shift
+			30823, -- Shamanistic Rage
+			26669, -- Evasion
+			22812, -- Ironbark
+			10278, -- Hand of Protection
+			-- 74001, -- Combat Readiness
+			31224, -- Cloak of Shadows
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			48792, -- Icebound Fortitude
+			49222, -- Bone Shield (DK UH talent)
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			498, -- Divine Protection
+			-- 157913, -- Evanesce
+			-- 115203, -- Fortifying Brew
+			22812, -- Barkskin
+			-- 122278, -- Dampen Harm        
+			61336, -- Survival Instincts
+			22842, -- Frenzied Regeneration
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 198589, -- Blur    
+			-- 196555, -- Netherwalk
+			-- 243435, -- Fortifying Brew
+			-- 206803, -- Rain from Above
+		},    
+		-- Damage buffs / debuffs
+		Rage = {
+			18499, -- Berserker Rage
+			12880, 14201, 14202, 14203, 14204, -- Enrage (Fury talent r1,2,3,4,5)
+			12292, -- Death Wish
+		}, 
+		DamageBuffs = {        
+			51690, -- Killing Spree
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			59672, -- Metamorphosis (demonology)
+			34692, -- The Beast Within 
+			3045, -- Rapid Fire
+			53434, -- Call of the Wild (Hunter pet)
+			1719, -- Recklessness
+			-- 193530, -- Aspect of the Wild (small burst)
+			-- 266779, -- Coordinated Assault
+			-- 193526, -- Trueshot
+			50213, -- Tiger's Fury (small burst)
+			50334, -- Berserk 
+			-- 102560, -- Incarnation: Chosen of Elune
+			-- 102543, -- Incarnation: King of the Jungle
+			11129, -- Combustion 
+			12042, -- Arcane Power                
+			12472, -- Icy Veins
+			12043, -- Presence of Mind (magic)
+			55342, -- Mirror Image
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			16166, -- Elemental Mastery 
+			-- 113858, -- Dark Soul: Instability
+			-- 267217, -- Nether Portal
+			-- 113860, -- Dark Soul: Misery
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+			51271, -- Pillar of Frost
+			85696, -- Zealotry
+			85730, -- Deadly Calm
+			77801, -- Demon Soul
+		},
+		DamageBuffs_Melee = {        
+			51690, -- Killing Spree
+			-- 121471, -- Shadow of Blades
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			1719, -- Recklessness
+			12292, -- Death Wish
+			-- 59672, -- Metamorphosis (demonology)
+			-- 266779, -- Coordinated Assault
+			50334, -- Berserk 
+			102543, -- Incarnation: King of the Jungle
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+			51271, -- Pillar of Frost
+			85696, -- Zealotry
+			85730, -- Deadly Calm		
+		},
+		BurstHaste = {
+			-- 90355, -- Ancient Hysteria
+			-- 146555, -- Drums of Rage
+			-- 178207, -- Drums of Fury
+			-- 230935, -- Drums of the Mountain
+			2825, -- Bloodlust
+			-- 80353, -- Time Warp
+			-- 160452, -- Netherwinds
+			32182, -- Heroism
+		},
+		-- SOME SPECIAL
+		DamageDeBuffs = {
+			-- 79140, -- Vendetta (debuff)
+			-- 115080, -- Touhc of Death (debuff)
+			-- 122470, -- KARMA
+		}, 
+		Flags = {
+			301091, -- Alliance flag
+			301089,  -- Horde flag 
+			34976,  -- Netherstorm Flag
+			-- 121164, -- Orb of Power
+		}, 
+		-- Cast Bars
+		Reshift = {
+			{118, 45}, -- Polymorph (45 coz of blink available)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+			-- {19386, 40}, -- Wyvern Sting
+		},
+		Premonition = {
+			-- {113724, 30}, -- Ring of Frost 
+			{118, 45}, -- Polymorph (45 coz of blink available while cast)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+		},
+		CastBarsCC = {
+			-- 113724, -- Ring of Frost
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			-- 20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting
+			33786, -- Cyclone
+			11446, -- Mind Control   
+		},
+		AllPvPKickCasts = {    
+			28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting -- Instant in wrath
+			33786, -- Cyclone
+			11446, -- Mind Control 
+			982, -- Revive Pet 
+			32375, -- Mass Dispel 
+			-- 203286, -- Greatest Pyroblast
+			59172, -- Chaos Bolt 
+			48477, -- Rebirth
+			-- 203155, -- Sniper Shot 
+			53007, -- Penance
+			48072, -- Prayer of Healing
+			6064, -- Heal
+			48070, -- Flash Heal
+			48120, -- Binding Heal                        (priest, holy)
+			-- 48113, -- Prayer of Mending (Instant in wrath)
+			64843, -- Divine Hymn
+			-- 120517, -- Halo                                (priest, holy/disc)
+			33247, -- Shadow Mend
+			-- 194509, -- Power Word: Radiance
+			-- 265202, -- Holy Word: Salvation                (priest, holy)
+			48063, -- Greater Heal                        (priest, holy)
+			48447, -- Tranquility
+			48443, -- Regrowth
+			-- 53251, -- Wild Growth -- Instant in wrath
+			50464, -- Nourish                             (druid, restoration)
+			55459, -- Chain Heal
+			-- 8004, -- Healing Surge
+			-- 73920, -- Healing Rain
+			49273, -- Healing Wave
+			49276, -- Lesser Healing Wave
+			-- 197995, -- Wellspring                          (shaman, restoration)
+			-- 207778, -- Downpour                            (shaman, restoration)
+			48785, -- Flash of Light
+			48782, -- Holy Light
+			-- 116670, -- Vivify
+			-- 124682, -- Enveloping Mist
+			-- 191837, -- Essence Font
+			-- 209525, -- Soothing Mist
+			-- 227344, -- Surging Mist                        (monk, mistweaver)
+		},    
+	}
+elseif BuildToC >= 30000 then
+	AuraList = {
+		-- CC SCHOOL TYPE 
+		Magic = {
+			12826, 28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			11446, -- Mind Control                
+			10955, -- Shackle Undead
+			18658, -- Hibernate
+			20066, -- Repentance          
+			6215, -- Fear
+			14311, -- Freezing Trap
+			14309, -- Freezing Trap Effect
+			60192, -- Freezing Arrow (hunter pvp)        
+			6358, -- Seduction
+			17928, -- Howl of Terror
+			47860, -- Death Coil
+			10890, -- Psychic Scream
+			31661, -- Dragon's Breath
+			15487, -- Silence        
+			48827, -- Avenger's Shield
+			49916, -- Strangulate
+			49203, -- Hungering Cold (DK frost talent)
+			47843, -- Unstable Affliction
+			10308, -- Hammer of Justice
+			64044, -- Psychic Horror
+			47847, -- Shadowfury
+			1122, -- Summon Infernal (Inferno)
+			59672, -- Metamorphosis (Demonology)
+		},
+		MagicRooted = {
+			53313, -- Entangling Roots
+			42917, -- Frost Nova
+			45524, -- Chains of Ice
+		}, 
+		Curse = {
+			51514, -- Hex   
+			11719, -- Curse of Tongues
+			50511, -- Curse of Weakness
+		},
+		Disease = {
+			196782, -- Outbreak (5 sec infecting dot)
+			191587, -- Outbreak (21+ sec dot)
+			48483, 48484, 48485, -- Infected Wounds (Feral slow)
+			59879, -- Blood Plague
+			59921, -- Frost Fever
+		},
+		Poison = {
+			49012, -- Wyvern Sting
+			3034, -- Viper Sting
+			3043, -- Scorpid Sting
+		},
+		Physical = {
+			51724, -- Sap
+			5246, -- Intimidating Shout
+			38764, -- Gouge
+			13741, 13793, 13792, -- Improved Gouge
+			2094, -- Blind
+			19503, -- Scatter Shot (hunter pvp talent)
+			1833, -- Cheap Shot
+			8643, -- Kidney Shot
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			19577, -- Intimidation
+			49803, -- Pounce
+			199804, -- Between the Eyes
+			49802, -- Maim
+			47481, -- Gnaw (DK pet)
+			51722, -- Dismantle
+			676, -- Disarm        
+			46968, -- Shockwave
+			20549, -- War Stomp
+		},
+		-- CC CONTROL TYPE
+		CrowdControl = {
+			-- Deprecated
+			18658, -- Hibernate
+		},
+		Incapacitated = {
+			-- Druid
+			49802, -- Maim (Feral PvP talent)
+			-- Hunter 
+			19503, -- Scatter Shot 
+			14311, -- Freezing Trap
+			14309, -- Freezing Trap Effect
+			60192, -- Freezing Arrow (hunter pvp)  
+			49012, -- Wyvern Sting
+			-- Mage 
+			12826, 28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey) 
+			-- Paladin 
+			20066, -- Repentance 
+			-- Priest 
+			10955, -- Shackle Undead
+			-- Rogue 
+			51724, -- Sap
+			38764, -- Gouge
+			13741, 13793, 13792, -- Improved Gouge	
+			-- Shaman		
+			51514, -- Hex (also 211004, 210873, 211015, 211010)   
+			-- Warlock 
+			710, 18647, -- Banish
+		},
+		Disoriented = {
+			-- Death Knight
+			-- Druid 
+			33786, -- Cyclone 
+			-- Hunter
+			-- Mage 
+			31661, -- Dragon's Breath (Fire)
+			-- Paladin 
+			-- Priest
+			10890, -- Psychic Scream
+			-- 226943, -- Mind Bomb
+			-- Rogue 
+			2094, -- Blind		
+			-- Warlock
+			6215, -- Fear
+			17928, -- Howl of Terror
+			115268, -- Mesmerize (Shivarra)
+			6358, -- Seduction (Succubus)
+			-- Warrior
+			5246, -- Intimidating Shout
+		},    
+		Fear = {
+			6215, -- Fear
+			17928, -- Howl of Terror
+			5246, -- Intimidating Shout
+			10890, -- Psychic Scream
+		},
+		Charmed = {
+			-- Deprecated
+			11446, -- Mind Control                  
+			10955, -- Shackle Undead
+		},
+		Sleep = {
+			18658, -- Hibernate
+		},
+		Stuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			49203, -- Hungering Cold
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Paladin 
+			10308, -- Hammer of Justice
+			-- Priest 
+			64044, -- Psychic Horror
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Warlock 
+			47847, -- Shadowfury
+			-- 89766, -- Axe Toss (pet)
+			1122, -- Summon Infernal (Inferno)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+			-- Kul Tiran
+		},
+		PhysStuned = {
+			-- Death Knight 
+			47481, -- Gnaw (pet)
+			-- Druid 
+			49802, -- Maim
+			-- 163505, -- Rake
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Hunter 
+			19577, -- Intimidation (pet)
+			-- Rogue 
+			1833, -- Cheap Shot 
+			408, -- Kidney Shot 
+			-- Druid 
+			49802, -- Maim
+			49803, -- Pounce
+			8983, -- Bash
+			16940, 16941, -- Brutal Impact (r1&2)
+			-- Warrior 
+			46968, -- Shockwave 
+			7922, -- Charge Stun
+			-- Tauren
+			20549, -- War Stomp
+		},
+		Silenced = {
+			-- Death Knight 
+			49916, -- Strangulate (Unholy/Blood)
+			-- Hunter 
+			34490, -- Silencing Shot
+			-- Paladin 
+			48827, -- Avenger's Shield	(Prot)	
+			-- Priest 
+			15487, -- Silence (Shadow)    
+			-- Rogue 		
+			1330, -- Garrote - Silence				
+			-- Warlock         
+			31117, -- Unstable Affliction -- Not 100% sure
+		},
+		Disarmed = {
+			-- Rogue 
+			51722, -- Dismantle
+			-- Warrior 
+			676, -- Disarm  
+		}, 
+		Rooted = {
+			53313, -- Entangling Roots Dispel able 
+			64695, -- Earthgrab
+			51485, -- Storm earth and fire
+			42917, -- Frost Nova
+			33395, -- Freeze (frost mage water elemental)
+			45334, -- Immobilized (wild charge, bear form) 
+			12289, 12668, 23695, -- Improved Hamstring (r1,2,3)     
+			19185, 64803, 64804, -- Entrapment (r1&2&3)
+			55509, -- Venom Web Spray (Hunter pet)
+		},  
+		Slowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold
+			42945, -- Blast Wave
+			1715, -- Hamstring
+			3775, -- Crippling Poison
+			3600, -- Earthbind
+			5116, -- Concussive Shot
+			7301, -- Frost Armor
+			48674, -- Deadly Throw
+			45524, -- Chains of Ice
+			50259, -- Dazed (Wild Charge, druid talent, cat form)
+			53227, -- Typhoon
+			12323, -- Piercing Howl
+			71647, -- Ice Trap
+			48156, -- Mind Flay
+			31589, -- Slow
+			48483, 48484, 48485, -- Infected Wounds
+			64186, -- Frostbrand Attack
+			53575, -- Tendon Rip (Hunter pet)
+			2974, -- Wing Clip
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			55741, 68766, -- Desecration (DK unholy talent)
+			50040, 50041, 50043, -- Chilblains (DK frost talent r1,2,3)
+			42931, -- Cone of Cold (frost mage)
+			53407, -- Judgement of Justice
+		},
+		MagicSlowed = {
+			42842, -- Frostbolt
+			42931, -- Cone of Cold       
+			3600, -- Earthbind
+			7301, -- Frost Armor
+			53227, -- Typhoon
+			64186, -- Frostbrand Attack
+			49236, -- Frost Shock
+			16927, -- Chilled (frost mage effect)
+			42931, -- Cone of Cold (frost mage)
+		},
+		BreakAble = {
+			12826, 28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			51724, -- Sap
+			20066, -- Repentance
+			51514, -- Hex
+			18658, -- Hibernate
+			6215, -- Fear
+			14311, -- Freezing Trap
+			14309, -- Freezing Trap Effect
+			60192, -- Freezing Arrow
+			6358, -- Seduction
+			2094, -- Blind
+			49012, -- Wyvern Sting  
+			17928, -- Howl of Terror
+			5246, -- Intimidating Shout
+			10890, -- Psychic Scream
+			38764, -- Gouge
+			13741, 13793, 13792, -- Improved Gouge
+			31661, -- Dragon's Breath
+			19503, -- Scatter Shot        
+			-- Rooted CC
+			--53313, -- Entangling Roots
+			--42917, -- Frost Nova
+		},
+		-- Imun Specific Buffs 
+		FearImun = {
+			34692, -- The Beast Within (Hunter BM PvP)
+			49039, -- Lichborne
+			8143, -- Tremor Totem 
+		},
+		StunImun = {
+			48792, -- Icebound Fortitude
+			6615, -- Free Action (Potion)
+			1953, -- Blink (micro buff)
+			46924, -- Bladestorm
+		},        
+		Freedom = {
+			1044, -- Hand of Freedom
+			46924, -- Bladestorm
+			53271, -- Master's Call    
+		},
+		TotalImun = {
+			710, 18647, -- Banish
+			642, -- Divine Shield
+			45438, -- Ice Block
+			20711, -- Spirit of Redemption
+		},
+		DamagePhysImun = {
+			10278, -- Hand of Protection
+			642, -- Bubble
+		},    
+		DamageMagicImun = {    -- When we can't totally damage    
+			31224, -- Cloak of Shadows
+		}, 
+		CCTotalImun = {
+			46924, -- Bladestorm   
+		},     
+		CCMagicImun = {
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+		}, 
+		Reflect = {            -- Only to cancel reflect effect  
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+
+		}, 
+		KickImun = { -- Imun Silence too
+			31821, -- Aura mastery
+		},
+		-- Purje 
+		ImportantPurje = {
+			10278, -- Hand of Protection
+			11129, -- Combustion 
+			10060, -- Power Infusion
+			12042, -- Arcane Power 
+			12472, -- Icy Veins
+			20216, -- Divine Favor 
+		},
+		SecondPurje = {
+			1044, -- Hand of Freedom      
+			-- We need purje druid only in bear form 
+			48451, -- Lifebloom
+			48441, -- Rejuvenation
+			-- 155777, -- Rejuvenation (Germination)
+			53251, -- Wild Growth    
+			48443, -- Regrowth
+			48469, 48470, -- Mark of the Wild & Gift of the Wild
+		},
+		PvEPurje = {
+			197797, 210662, 211632, 209033, 198745, 194615, 282098, 301629, 297133, 266201, 258938, 268709, 268375, 274210, 276265,
+		},
+		-- Speed 
+		Speed = {
+			11305, -- Sprint
+			2379, -- Speed (Swiftness Potion)
+			2645, -- Ghost Wolf
+			7840, -- Swim Speed (Swim Speed Potion)
+			36554, -- Shadowstep
+			54861, -- Nitro Boosts
+			-- 58875, -- Spirit Walk
+			64127, 64129, -- Body and Soul (r1,2)
+			-- 68992, -- Darkflight
+			-- 85499, -- Speed of Light
+			-- 87023, -- Cauterize
+			31641, 31642, -- Blazing Speed (r1,2)
+			33357, -- Dash
+			-- 77761, -- Stampeding Roar
+			-- 111400, -- Burning Rush
+			-- 116841, -- Tiger's Lust
+			-- 118922, -- Posthaste
+			-- 119085, -- Chi Torpedo
+			-- 121557, -- Angelic Feather
+			-- 137452, -- Displacer Beast
+			-- 137573, -- Burst of Speed
+			-- 192082, -- Wind Rush (shaman wind rush totem talent)
+			-- 196674, -- Planewalker (warlock artifact trait)
+			-- 197023, -- Cut to the chase (rogue pvp talent)
+			-- 199407, -- Light on your feet (mistweaver monk artifact trait)
+			-- 201233, -- whirling kicks (windwalaker monk pvp talent)
+			-- 201447, -- Ride the wind (windwalaker monk pvp talent)
+			-- 209754, -- Boarding Party (rogue pvp talent)
+			-- 210980, -- Focus in the light (holy priest artifact trait)
+			-- 213177, -- swift as a coursing river (brewmaster artifact trait)
+			-- 214121, -- Body and Mind (priest talent)
+			-- 215572, -- Frothing Berserker (warrior talent)
+			-- 231390, -- Trailblazer (hunter talent)
+			5118, 13159,  -- Aspect of the Cheetah & Aspect of the Pack
+			-- 204475, -- Windburst (marks hunter artifact ability)        
+		},
+		-- Deff 
+		DeffBuffsMagic = {
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender 
+			64205, -- Divine Sacrifice 
+			53527, -- Divine Guardian
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword 
+			-- 104773, -- Unending Resolve        
+			-- 108271, -- Astral Shift
+			6940, -- Hand of Sacrifice
+			31224, -- Cloak of Shadows
+			48707, -- Anti-Magic Shell    
+			8178, -- Grounding Totem Effect
+			23920, -- Spell Reflection
+			-- 213915, -- Mass reflect
+			-- 212295, -- Nether Ward (Warlock)
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			-- 122278, -- Dampen Harm 
+			61336, -- Survival Instincts -- Believe this is physical?
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 204018, -- Blessing of Spellwarding
+			-- 196555, -- Netherwalk
+			-- 206803, -- Rain from Above
+		}, 
+		DeffBuffs = {        
+			-- 76577, -- Smoke Bomb
+			-- 53480, -- Road of Sacriface
+			-- 116849, -- Life Cocoon
+			50720, -- Vigilance
+			47788, -- Guardian Spirit
+			-- 31850, -- Ardent Defender        
+			871, -- Shield Wall
+			-- 118038, -- Die by the Sword        
+			-- 104773, -- Unending Resolve
+			6940, -- Hand of Sacrifice
+			-- 108271, -- Astral Shift
+			30823, -- Shamanistic Rage
+			26669, -- Evasion
+			22812, -- Ironbark
+			10278, -- Hand of Protection
+			-- 74001, -- Combat Readiness
+			31224, -- Cloak of Shadows
+			33206, -- Pain Suppression
+			47585, -- Dispersion
+			-- 186265, -- Aspect of Turtle
+			48792, -- Icebound Fortitude
+			49222, -- Bone Shield (DK UH talent)
+			-- 115176, -- Zen Meditation
+			-- 122783, -- Diffuse Magic
+			-- 86659, -- Guardian of Ancient Kings
+			642, -- Divine Shield
+			45438, -- Ice Block
+			498, -- Divine Protection
+			-- 157913, -- Evanesce
+			-- 115203, -- Fortifying Brew
+			22812, -- Barkskin
+			-- 122278, -- Dampen Harm        
+			61336, -- Survival Instincts
+			22842, -- Frenzied Regeneration
+			45182, -- Cheating Death
+			31230, -- Cheat Death
+			-- 198589, -- Blur    
+			-- 196555, -- Netherwalk
+			-- 243435, -- Fortifying Brew
+			-- 206803, -- Rain from Above
+		},    
+		-- Damage buffs / debuffs
+		Rage = {
+			18499, -- Berserker Rage
+			12880, 14201, 14202, 14203, 14204, -- Enrage (Fury talent r1,2,3,4,5)
+			12292, -- Death Wish
+		}, 
+		DamageBuffs = {        
+			51690, -- Killing Spree
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			59672, -- Metamorphosis (demonology)
+			34692, -- The Beast Within 
+			3045, -- Rapid Fire
+			53434, -- Call of the Wild (Hunter pet)
+			1719, -- Recklessness
+			-- 193530, -- Aspect of the Wild (small burst)
+			-- 266779, -- Coordinated Assault
+			-- 193526, -- Trueshot
+			50213, -- Tiger's Fury (small burst)
+			50334, -- Berserk 
+			-- 102560, -- Incarnation: Chosen of Elune
+			-- 102543, -- Incarnation: King of the Jungle
+			11129, -- Combustion 
+			12042, -- Arcane Power                
+			12472, -- Icy Veins
+			12043, -- Presence of Mind (magic)
+			55342, -- Mirror Image
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			16166, -- Elemental Mastery 
+			-- 113858, -- Dark Soul: Instability
+			-- 267217, -- Nether Portal
+			-- 113860, -- Dark Soul: Misery
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+		},
+		DamageBuffs_Melee = {        
+			51690, -- Killing Spree
+			-- 121471, -- Shadow of Blades
+			51713, -- Shadow Dance
+			13750, -- Adrenaline Rush
+			1719, -- Recklessness
+			12292, -- Death Wish
+			-- 59672, -- Metamorphosis (demonology)
+			-- 266779, -- Coordinated Assault
+			50334, -- Berserk 
+			102543, -- Incarnation: King of the Jungle
+			-- 51271, -- Pillar of Frost
+			49016, -- Unholy Frenzy 
+			31884, -- Avenging Wrath
+			-- 236321, -- Warbanner
+			-- 107574, -- Avatar        
+			-- 114050, -- Ascendance
+			-- 137639, -- Storm, Earth, and Fire
+			-- 152173, -- Serenity
+		},
+		BurstHaste = {
+			-- 90355, -- Ancient Hysteria
+			-- 146555, -- Drums of Rage
+			-- 178207, -- Drums of Fury
+			-- 230935, -- Drums of the Mountain
+			2825, -- Bloodlust
+			-- 80353, -- Time Warp
+			-- 160452, -- Netherwinds
+			32182, -- Heroism
+		},
+		-- SOME SPECIAL
+		DamageDeBuffs = {
+			-- 79140, -- Vendetta (debuff)
+			-- 115080, -- Touhc of Death (debuff)
+			-- 122470, -- KARMA
+		}, 
+		Flags = {
+			301091, -- Alliance flag
+			301089,  -- Horde flag 
+			34976,  -- Netherstorm Flag
+			-- 121164, -- Orb of Power
+		}, 
+		-- Cast Bars
+		Reshift = {
+			{118, 45}, -- Polymorph (45 coz of blink available)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+			-- {19386, 40}, -- Wyvern Sting
+		},
+		Premonition = {
+			-- {113724, 30}, -- Ring of Frost 
+			{118, 45}, -- Polymorph (45 coz of blink available while cast)
+			{20066, 30}, -- Repentance 
+			{51514, 30}, -- Hex 
+			{49012, 40}, -- Wyvern Sting
+			{6215, 30}, -- Fear 
+		},
+		CastBarsCC = {
+			-- 113724, -- Ring of Frost
+			12826, 28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			-- 20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting
+			6215, -- Fear
+			33786, -- Cyclone
+			11446, -- Mind Control   
+		},
+		AllPvPKickCasts = {    
+			12826, 28271, 28272, 61305, 61721, 61780, -- Polymorph (regular, turtle, pig, black cat, rabbit, turkey)
+			20066, -- Repentance
+			51514, -- Hex
+			-- 19386, -- Wyvern Sting -- Instant in wrath
+			6215, -- Fear
+			33786, -- Cyclone
+			11446, -- Mind Control 
+			982, -- Revive Pet 
+			32375, -- Mass Dispel 
+			-- 203286, -- Greatest Pyroblast
+			59172, -- Chaos Bolt 
+			48477, -- Rebirth
+			-- 203155, -- Sniper Shot 
+			53007, -- Penance
+			48072, -- Prayer of Healing
+			6064, -- Heal
+			48070, -- Flash Heal
+			48120, -- Binding Heal                        (priest, holy)
+			-- 48113, -- Prayer of Mending (Instant in wrath)
+			64843, -- Divine Hymn
+			-- 120517, -- Halo                                (priest, holy/disc)
+			33247, -- Shadow Mend
+			-- 194509, -- Power Word: Radiance
+			-- 265202, -- Holy Word: Salvation                (priest, holy)
+			48063, -- Greater Heal                        (priest, holy)
+			48447, -- Tranquility
+			48443, -- Regrowth
+			-- 53251, -- Wild Growth -- Instant in wrath
+			50464, -- Nourish                             (druid, restoration)
+			55459, -- Chain Heal
+			-- 8004, -- Healing Surge
+			-- 73920, -- Healing Rain
+			49273, -- Healing Wave
+			49276, -- Lesser Healing Wave
+			-- 197995, -- Wellspring                          (shaman, restoration)
+			-- 207778, -- Downpour                            (shaman, restoration)
+			48785, -- Flash of Light
+			48782, -- Holy Light
+			-- 116670, -- Vivify
+			-- 124682, -- Enveloping Mist
+			-- 191837, -- Essence Font
+			-- 209525, -- Soothing Mist
+			-- 227344, -- Surging Mist                        (monk, mistweaver)
+		},    
+	}
+elseif BuildToC >= 20000 then
+	AuraList = {
+		-- CC SCHOOL TYPE 
+		Magic = {         
+			853, 				-- Hammer of Justice 		(Paladin)
+			20066, 				-- Repentance				(Paladin)
+			17390,				-- Faerie Fire (Feral)		(Druid)		
+			2637, 				-- Hibernate 				(Druid)
+			1499, 				-- Freezing Trap			(Hunter)
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			605, 				-- Mind Control 			(Priest)                 
+			8122, 				-- Psychic Scream			(Priest)
+			9484, 				-- Shackle Undead 			(Priest)  				
+			15487, 				-- Silence 					(Priest)
+			5782, 				-- Fear						(Warlock)        
+			6358, 				-- Seduction 				(Warlock)
+			5484, 				-- Howl of Terror        	(Warlock)        
+			710, 				-- Banish 					(Warlock)
+			-- Roots 
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)		
+			339, 				-- Entangling Roots 		(Druid)		
+		},
+		MagicRooted = {
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)		
+			339, 				-- Entangling Roots 		(Druid)
+		}, 
+		Curse = {
+			8277, 				-- Voodoo Hex   			(Shaman) 				-- I AM NOT SURE
+		},
+		--Disease = {},
+		Poison = {
+			24133, 				-- Wyvern Sting 			(Hunter)
+			3034, 				-- Viper Sting 				(Hunter)
+			3043,		 		-- Scorpid Sting 			(Hunter)
+			7992, 				-- Slowing Poison 			(Rogue)
+			3408, 				-- Crippling Poison 		(Rogue)
+		},
+		Physical = {
+			7922, 				-- Charge Stun				(Warrior)
+			676, 				-- Disarm 					(Warrior)
+			5246, 				-- Intimidating Shout		(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)
+			12355,				-- Impact					(Mage, physical effect)
+			19503, 				-- Scatter Shot 			(Hunter)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			408, 				-- Kidney Shot 				(Rogue)	
+			1833, 				-- Cheap Shot 				(Rogue)        
+			1776, 				-- Gouge					(Rogue)		
+			6770, 				-- Sap 						(Rogue)
+			2094, 				-- Blind					(Rogue)		        
+			20549, 				-- War Stomp 				(Tauren)	
+			20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?
+			5530,				-- Mace Stun				(Unknown)
+			16922,				-- Starfire Stun			(Unknown)
+	   },
+		-- CC CONTROL TYPE
+		Incapacitated = { 
+			1499, 				-- Freezing Trap			(Hunter) 
+			20066, 				-- Repentance				(Paladin)
+			6770, 				-- Sap 						(Rogue)
+			1776, 				-- Gouge					(Rogue)
+			710, 				-- Banish        			(Warlock)
+			22570,				-- Mangle					(Druid)
+		},
+		Fleeing	= {
+			5782, 				-- Fear						(Warlock)
+			5484, 				-- Howl of Terror   		(Warlock)
+			5246, 				-- Intimidating Shout		(Warrior)
+			8122, 				-- Psychic Scream			(Priest)
+		},
+		Shackled = {
+			9484, 				-- Shackle Undead 			(Priest)	
+		},
+		Polymorphed	= {
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28272,				-- Polymorph: Pig			(Mage)
+			28271,				-- Polymorph: Turtle		(Mage)
+		},
+		Disoriented = {			
+			19503, 				-- Scatter Shot 			(Hunter)		 
+			2094, 				-- Blind					(Rogue)
+		},    
+		Fear = {
+			5782, 				-- Fear						(Warlock)
+			5484, 				-- Howl of Terror   		(Warlock)
+			5246, 				-- Intimidating Shout		(Warrior)
+			6789,				-- Death Coil				(Warlock)
+			8122, 				-- Psychic Scream			(Priest)
+		},
+		Charmed = {
+			605, 				-- Mind Control 			(Priest)                 
+			--9484, 				-- Shackle Undead 			(Priest)
+		},
+		Sleep = {
+			2637, 				-- Hibernate 				(Druid)	
+			19386, 				-- Wyvern Sting 			(Hunter)
+		},
+		Stuned = {
+			7922, 				-- Charge Stun				(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5530,				-- Mace Stun Effect			(Warrior)
+			12798,				-- Revenge Stun				(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)
+			12355,				-- Impact					(Mage, physical effect)
+			22703,				-- Inferno Effect			(Warlock)
+			18093,				-- Pyroclasm				(Warlock)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			853, 				-- Hammer of Justice 		(Paladin)
+			1833, 				-- Cheap Shot 				(Rogue)
+			408, 				-- Kidney Shot 				(Rogue)	
+			20549, 				-- War Stomp 				(Tauren)
+			20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?			
+			16922,				-- Starfire Stun			(Unknown)
+			56,					-- Stun 					(Weapon proc)
+			4067,				-- Big Bronze Bomb
+			4066,				-- Small Bronze Bomb
+			4065,				-- Large Copper Bomb
+			4064,				-- Rough Copper Bomb
+			13808,				-- M73 Frag Grenade
+			19769,				-- Thorium Grenade
+		},
+		PhysStuned = {
+			7922, 				-- Charge Stun				(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5530,				-- Mace Stun Effect			(Warrior)
+			12798,				-- Revenge Stun				(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)		
+			12355,				-- Impact					(Mage, physical effect)
+			22703,				-- Inferno Effect			(Warlock)
+			18093,				-- Pyroclasm				(Warlock)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			1833, 				-- Cheap Shot 				(Rogue)
+			408, 				-- Kidney Shot 				(Rogue)		
+			20549, 				-- War Stomp 				(Tauren)	
+			20685,				-- Storm Bolt	 			(Unknown)				-- FIX ME: Is it useable?		
+			16922,				-- Starfire Stun			(Unknown)		
+			56,					-- Stun 					(Weapon proc)	
+			4067,				-- Big Bronze Bomb
+			4066,				-- Small Bronze Bomb
+			4065,				-- Large Copper Bomb
+			4064,				-- Rough Copper Bomb
+		},
+		Silenced = {
+			15487, 				-- Silence 					(Priest) 
+			18469,				-- Counterspell - Silenced	(Mage)
+			18425,				-- Kick - Silenced			(Rogue)
+			24259,				-- Spell Lock (Felhunter) 	(Warlock)
+			19821,				-- Arcane Bomb
+			18278,				-- Silence (Silent Fang sword)
+		},
+		Disarmed = {
+			676, 				-- Disarm 					(Warrior)
+			14251,				-- Riposte					(Rogue)
+			23365,				-- Dropped Weapon			(Unknown)
+		},
+		Rooted = {
+			23694,				-- Improved Hamstring		(Warrior)
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)	
+			12494,				-- Frostbite				(Mage)	
+			339, 				-- Entangling Roots 		(Druid)
+			19675,				-- Feral Charge Effect		(Druid)
+			19229,				-- Improved Wing Clip 		(Hunter)
+			19185,				-- Entrapment				(Hunter)
+			25999,				-- Boar Charge				(Hunter's pet)		
+		},  
+		Slowed = {		
+			1715, 				-- Hamstring				(Warrior)
+			12323, 				-- Piercing Howl			(Warrior)
+			3408, 				-- Crippling Poison			(Rogue)        
+			7992, 				-- Slowing Poison			(Rogue)
+			2974, 				-- Wing Clip				(Hunter)
+			5116, 				-- Concussive Shot			(Hunter)
+			13496, 				-- Dazed (aka "confuse")	(Druid, Hunter)        
+			17311, 				-- Mind Flay				(Priest)                               
+			2484, 				-- Earthbind				(Shaman)
+			8056, 				-- Frost Shock				(Shaman)
+			8034, 				-- Frostbrand Attack		(Shaman)
+			116, 				-- Frostbolt     			(Mage)
+			120, 				-- Cone of Cold				(Mage)
+			6136, 				-- Chilled 					(Mage)		
+			16094, 				-- Frost Breath 			(Mage)        
+			11113, 				-- Blast Wave				(Mage)
+			3604, 				-- Tendon Rip				(Unknown)
+		},
+		MagicSlowed = {        
+			2484, 				-- Earthbind				(Shaman)
+			8056, 				-- Frost Shock				(Shaman)
+			8034, 				-- Frostbrand Attack		(Shaman)				-- FIX ME: I AM NOT SURE 		
+			6136, 				-- Chilled 					(Mage)	 				-- FIX ME: I AM NOT SURE 
+			16094, 				-- Frost Breath 			(Mage)					-- FIX ME: I AM NOT SURE 
+			120, 				-- Cone of Cold 			(Mage)
+			116, 				-- Frostbolt     			(Mage)
+		},
+		BreakAble = {
+			5246, 				-- Intimidating Shout		(Warrior)
+			20066, 				-- Repentance				(Paladin)		
+			2637, 				-- Hibernate				(Druid)
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28272,				-- Polymorph: Pig			(Mage)
+			28271,				-- Polymorph: Turtle		(Mage)
+			1499, 				-- Freezing Trap			(Hunter)
+			19386, 				-- Wyvern Sting   			(Hunter)	
+			19503, 				-- Scatter Shot        		(Hunter)
+			6770, 				-- Sap 						(Rogue)
+			2094, 				-- Blind					(Rogue) 
+			1776, 				-- Gouge					(Rogue)
+			5782, 				-- Fear						(Warlock)        
+			6358, 				-- Seduction (pet)			(Warlock)                
+			5484, 				-- Howl of Terror			(Warlock)
+			8122, 				-- Psychic Scream			(Priest)      
+			9484, 				-- Shackle Undead 			(Priest)			
+			-- Rooted CC
+			339, 				-- Entangling Roots			(Druid)
+			122, 				-- Frost Nova				(Mage)
+		},
+		-- Imun Specific Buffs 
+		FearImun = {
+			18499, 				-- Berserker Rage 			(Warrior)
+			12328,				-- Death Wish				(Warrior)
+			1719,				-- Recklessness				(Warrior)
+			8143, 				-- Tremor Totem 			(Shaman)
+			6346,				-- Fear Ward				(Priest)		
+		},
+		FearImunDeBuffs = {
+			704,				-- Curse of Recklessness 	(Warlock)
+		},
+		StunImun = {
+			6615, 				-- Free Action 				(Free Action Potion)
+			24364,				-- Living Free Action		(Potion)
+			1953, 				-- Blink (micro buff)		(Mage)
+		},        
+		Freedom = {
+			6615, 				-- Free Action 				(Free Action Potion)
+			1044, 				-- Blessing of Freedom		(Paladin)
+			24364,				-- Living Free Action		(Potion)
+		},
+		TotalImun = {
+			710, 				-- Banish 					(Warlock)
+			498, 				-- Divine Protection		(Paladin)
+			642, 				-- Divine Shield			(Paladin)		
+			11958, 				-- Ice Block				(Mage)
+			19263, 				-- Deterrence    			(Hunter)
+			20711, 				-- Spirit of Redemption		(Priest)
+			17624,				-- Petrification			(Flask of Petrification)
+		},
+		DamagePhysImun = {		
+			1022, 				-- Blessing of Protection	(Paladin)
+			3169,				-- Invulnerability			(Limited Invulnerability Potion)
+			--16621,			-- Self Invulnerability (Invulnerable Mail weapon) -- FIX ME: seems only for swing attacks
+		},
+		DamageMagicImun = {}, 
+		CCTotalImun = {},     
+		CCMagicImun = {
+			8178,				-- Grounding Totem Effect	(Shaman)
+		},
+		Reflect = { 
+			8178, 				-- Grounding Totem Effect	(Shaman)
+			23131, 				-- Frost Reflector			(Item)
+			23132, 				-- Shadow Reflector			(Item)
+			23097, 				-- Fire Reflector			(Item)
+		}, 
+		KickImun = {},
+		-- Purje 
+		ImportantPurje = {
+			1022, 				-- Blessing of Protection	(Paladin)
+			20216, 				-- Divine Favor 			(Paladin)		
+			11129, 				-- Combustion 				(Mage)
+			12042, 				-- Arcane Power 			(Mage)
+			10060, 				-- Power Infusion			(Priest)
+			29166,				-- Innervate				(Druid)
+			2645, 				-- Ghost Wolf 				(Shaman)
+			16166, 				-- Elemental Mastery		(Shaman)
+			17730,				-- Major Spellstone			(Warlock)
+			17729,				-- Greater Spellstone		(Warlock)
+			128,				-- Spellstone				(Warlock)
+			18708,				-- Fel Domination			(Warlock)
+			18288,				-- Amplify Curse			(Warlock)		
+		},
+		SecondPurje = {
+			1044, 				-- Blessing of Freedom      (Paladin)  
+			-- We need purje druid only in bear form 
+			467,				-- Thorns					(Druid)
+			774, 				-- Rejuvenation				(Druid)
+			8936, 				-- Regrowth 				(Druid)
+			1126, 				-- Mark of the Wild			(Druid)
+		},
+		-- Speed 
+		Speed = {
+			2983, 				-- Sprint 					(Rogue)
+			2379, 				-- Speed 					(Swiftness Potion)
+			2645, 				-- Ghost Wolf 				(Shaman)
+			1850, 				-- Dash 					(Druid)
+			5118, 				-- Aspect of the Cheetah	(Hunter)       
+		},
+		-- Deff 
+		DeffBuffsMagic = {
+			8178, 				-- Grounding Totem Effect	(Shaman)
+			--498, 					-- Divine Protection		(Paladin)
+			--642, 					-- Divine Shield			(Paladin)
+			--11958, 				-- Ice Block				(Mage)
+			--19263, 				-- Deterrence    			(Hunter)
+			--20711, 				-- Spirit of Redemption		(Priest)		
+		}, 
+		DeffBuffs = {        
+			871,				-- ShieldWall				(Warrior)
+			20230,				-- Retaliation				(Warrior)
+			5277, 				-- Evasion					(Rogue)
+			1022, 				-- Blessing of Protection	(Paladin)
+			22812,				-- Barkskin					(Druid)
+			3169,				-- Invulnerability			(Limited Invulnerability Potion)
+			--498, 					-- Divine Protection		(Paladin)
+			--642, 					-- Divine Shield			(Paladin)
+			--11958, 				-- Ice Block				(Mage)
+			--19263, 				-- Deterrence    			(Hunter)
+			--20711, 				-- Spirit of Redemption		(Priest)		
+		},  
+		SmallDeffBuffs = {
+			20594,				-- Stoneform				(Dwarf)
+			6940, 				-- Blessing of Sacrifice	(Paladin)
+		},
+		-- Damage buffs / debuffs
+		Rage = {
+			18499, 				-- Berserker Rage (Warrior)
+			12880, 				-- Enrage (Warrior)
+		}, 
+		DamageBuffs = {        
+			12328,				-- Death Wish 				(Warrior)		
+			1719,				-- Recklessness				(Warrior)
+			13877,				-- Blade Flurry				(Rogue)
+			13750,				-- Adrenaline Rush			(Rogue)
+			19574,				-- Bestial Wrath			(Hunter)
+			11129, 				-- Combustion 				(Mage)
+			12042, 				-- Arcane Power 			(Mage)
+			26297,				-- Berserking				(Troll)
+			20572,				-- Blood Fury				(Orc)
+		},
+		DamageBuffs_Melee = {        
+			12328,				-- Death Wish 				(Warrior)	
+			1719,				-- Recklessness				(Warrior)
+			13750,				-- Adrenaline Rush			(Rogue)
+			13877,				-- Blade Flurry				(Rogue)		
+		},
+		BurstHaste = {
+			19372, 				-- Ancient Hysteria 		(Unknown)
+			24185, 				-- Bloodlust 				(Unknown)
+		},
+		-- SOME SPECIAL
+		--DamageDeBuffs = {}, 
+		Flags = {
+			301091, 			-- Alliance flag
+			301089,  			-- Horde flag 
+			23333,				-- Warsong Flag
+			23335,  			-- Silverwing Flag
+		}, 
+		-- Cast Bars
+		Reshift = {
+			{118, 30}, 			-- Polymorph 				(Mage)
+			{19386, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
+		},
+		Premonition = {
+			{118, 30}, 			-- Polymorph 				(Mage)
+			{851, 20},			-- Polymorph: Sheep 		(Mage)
+			{28272, 30},		-- Polymorph: Pig	 		(Mage)
+			{28271, 30},		-- Polymorph: Turtle 		(Mage)
+			{24133, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
+			{5782, 20}, 		-- Fear 					(Warlock)        
+		},
+		CastBarsCC = {
+			118, 				-- Polymorph 				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			20066, 				-- Repentance 				(Paladin)
+			24133, 				-- Wyvern Sting 			(Hunter)
+			5782, 				-- Fear 					(Warlock) 
+			5484, 				-- Howl of Terror   		(Warlock)
+			605, 				-- Mind Control 			(Priest)                 
+			9484, 				-- Shackle Undead 			(Priest) 
+		},
+		AllPvPKickCasts = {    
+			118, 				-- Polymorph 				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			635,				-- Holy Light				(Paladin)
+			19750,				-- Flash of Light			(Paladin)
+			20066, 				-- Repentance 				(Paladin)		
+			5782, 				-- Fear 					(Warlock) 
+			19386, 				-- Wyvern Sting 			(Hunter)       
+			982, 				-- Revive Pet 				(Hunter)
+			605, 				-- Mind Control 			(Priest)  
+			9484, 				-- Shackle Undead 			(Priest) 
+			4526, 				-- Mass Dispel 				(Priest)	
+			596, 				-- Prayer of Healing		(Priest)
+			2060,				-- Greater Heal				(Priest)
+			2061,				-- Flash Heal				(Priest)
+			740, 				-- Tranquility				(Druid)
+			20484, 				-- Rebirth					(Druid)
+			25297,				-- Healing Touch			(Druid)
+			8936, 				-- Regrowth 				(Druid)
+			331,				-- Healing Wave				(Shaman)
+			1064,				-- Chain Heal				(Shaman)
+		},    
+	}
+else
+	AuraList = {
+		-- CC SCHOOL TYPE 
+		Magic = {         
+			853, 				-- Hammer of Justice 		(Paladin)
+			20066, 				-- Repentance				(Paladin)
+			17390,				-- Faerie Fire (Feral)		(Druid)		
+			2637, 				-- Hibernate 				(Druid)
+			1499, 				-- Freezing Trap			(Hunter)
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28270,				-- Polymorph: Cow			(Mage)
+			605, 				-- Mind Control 			(Priest)                 
+			8122, 				-- Psychic Scream			(Priest)
+			9484, 				-- Shackle Undead 			(Priest)  				
+			15487, 				-- Silence 					(Priest)
+			5782, 				-- Fear						(Warlock)        
+			6358, 				-- Seduction 				(Warlock)
+			5484, 				-- Howl of Terror        	(Warlock)        
+			710, 				-- Banish 					(Warlock)
+			-- Roots 
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)		
+			339, 				-- Entangling Roots 		(Druid)		
+		},
+		MagicRooted = {
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)		
+			339, 				-- Entangling Roots 		(Druid)
+		}, 
+		Curse = {
+			8277, 				-- Voodoo Hex   			(Shaman) 				-- I AM NOT SURE
+		},
+		--Disease = {},
+		Poison = {
+			24133, 				-- Wyvern Sting 			(Hunter)
+			3034, 				-- Viper Sting 				(Hunter)
+			3043,		 		-- Scorpid Sting 			(Hunter)
+			7992, 				-- Slowing Poison 			(Rogue)
+			3408, 				-- Crippling Poison 		(Rogue)
+		},
+		Physical = {
+			7922, 				-- Charge Stun				(Warrior)
+			676, 				-- Disarm 					(Warrior)
+			5246, 				-- Intimidating Shout		(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)
+			12355,				-- Impact					(Mage, physical effect)
+			19503, 				-- Scatter Shot 			(Hunter)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			408, 				-- Kidney Shot 				(Rogue)	
+			1833, 				-- Cheap Shot 				(Rogue)        
+			1776, 				-- Gouge					(Rogue)		
+			6770, 				-- Sap 						(Rogue)
+			2094, 				-- Blind					(Rogue)		        
+			20549, 				-- War Stomp 				(Tauren)	
+			20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?
+			5530,				-- Mace Stun				(Unknown)
+			16922,				-- Starfire Stun			(Unknown)
+	   },
+		-- CC CONTROL TYPE
+		Incapacitated = { 
+			1499, 				-- Freezing Trap			(Hunter) 
+			20066, 				-- Repentance				(Paladin)
+			6770, 				-- Sap 						(Rogue)
+			1776, 				-- Gouge					(Rogue)
+			710, 				-- Banish        			(Warlock)
+			22570,				-- Mangle					(Druid)
+		},
+		Fleeing	= {
+			5782, 				-- Fear						(Warlock)
+			5484, 				-- Howl of Terror   		(Warlock)
+			5246, 				-- Intimidating Shout		(Warrior)
+			8122, 				-- Psychic Scream			(Priest)
+		},
+		Shackled = {
+			9484, 				-- Shackle Undead 			(Priest)	
+		},
+		Polymorphed	= {
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28270,				-- Polymorph: Cow			(Mage)
+			28272,				-- Polymorph: Pig			(Mage)
+			28271,				-- Polymorph: Turtle		(Mage)
+		},
+		Disoriented = {			
+			19503, 				-- Scatter Shot 			(Hunter)		 
+			2094, 				-- Blind					(Rogue)
+		},    
+		Fear = {
+			5782, 				-- Fear						(Warlock)
+			5484, 				-- Howl of Terror   		(Warlock)
+			5246, 				-- Intimidating Shout		(Warrior)
+			6789,				-- Death Coil				(Warlock)
+			8122, 				-- Psychic Scream			(Priest)
+		},
+		Charmed = {
+			605, 				-- Mind Control 			(Priest)                 
+			--9484, 				-- Shackle Undead 			(Priest)
+		},
+		Sleep = {
+			2637, 				-- Hibernate 				(Druid)	
+			19386, 				-- Wyvern Sting 			(Hunter)
+		},
+		Stuned = {
+			7922, 				-- Charge Stun				(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5530,				-- Mace Stun Effect			(Warrior)
+			12798,				-- Revenge Stun				(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)
+			12355,				-- Impact					(Mage, physical effect)
+			22703,				-- Inferno Effect			(Warlock)
+			18093,				-- Pyroclasm				(Warlock)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			853, 				-- Hammer of Justice 		(Paladin)
+			1833, 				-- Cheap Shot 				(Rogue)
+			408, 				-- Kidney Shot 				(Rogue)	
+			20549, 				-- War Stomp 				(Tauren)
+			20685,				-- Storm Bolt 				(Unknown)				-- FIX ME: Is it useable?			
+			16922,				-- Starfire Stun			(Unknown)
+			56,					-- Stun 					(Weapon proc)
+			4067,				-- Big Bronze Bomb
+			4066,				-- Small Bronze Bomb
+			4065,				-- Large Copper Bomb
+			4064,				-- Rough Copper Bomb
+			13808,				-- M73 Frag Grenade
+			19769,				-- Thorium Grenade
+		},
+		PhysStuned = {
+			7922, 				-- Charge Stun				(Warrior)
+			12809,				-- Concussion Blow			(Warrior)
+			20253,				-- Intercept Stun 			(Warrior)
+			5530,				-- Mace Stun Effect			(Warrior)
+			12798,				-- Revenge Stun				(Warrior)
+			5211,				-- Bash						(Druid)
+			9005,				-- Pounce					(Druid)		
+			12355,				-- Impact					(Mage, physical effect)
+			22703,				-- Inferno Effect			(Warlock)
+			18093,				-- Pyroclasm				(Warlock)
+			19577,				-- Intimidation 			(Hunter)  				-- Berserker Rage can remove it!
+			19410,				-- Improved Concussive Shot	(Hunter)
+			1833, 				-- Cheap Shot 				(Rogue)
+			408, 				-- Kidney Shot 				(Rogue)		
+			20549, 				-- War Stomp 				(Tauren)	
+			20685,				-- Storm Bolt	 			(Unknown)				-- FIX ME: Is it useable?		
+			16922,				-- Starfire Stun			(Unknown)		
+			56,					-- Stun 					(Weapon proc)	
+			4067,				-- Big Bronze Bomb
+			4066,				-- Small Bronze Bomb
+			4065,				-- Large Copper Bomb
+			4064,				-- Rough Copper Bomb
+		},
+		Silenced = {
+			15487, 				-- Silence 					(Priest) 
+			18469,				-- Counterspell - Silenced	(Mage)
+			18425,				-- Kick - Silenced			(Rogue)
+			24259,				-- Spell Lock (Felhunter) 	(Warlock)
+			19821,				-- Arcane Bomb
+			18278,				-- Silence (Silent Fang sword)
+		},
+		Disarmed = {
+			676, 				-- Disarm 					(Warrior)
+			14251,				-- Riposte					(Rogue)
+			23365,				-- Dropped Weapon			(Unknown)
+		},
+		Rooted = {
+			23694,				-- Improved Hamstring		(Warrior)
+			22519, 				-- Ice Nova 				(Mage)
+			122, 				-- Frost Nova 				(Mage)	
+			12494,				-- Frostbite				(Mage)	
+			339, 				-- Entangling Roots 		(Druid)
+			19675,				-- Feral Charge Effect		(Druid)
+			19229,				-- Improved Wing Clip 		(Hunter)
+			19185,				-- Entrapment				(Hunter)
+			25999,				-- Boar Charge				(Hunter's pet)		
+		},  
+		Slowed = {		
+			1715, 				-- Hamstring				(Warrior)
+			12323, 				-- Piercing Howl			(Warrior)
+			3408, 				-- Crippling Poison			(Rogue)        
+			7992, 				-- Slowing Poison			(Rogue)
+			2974, 				-- Wing Clip				(Hunter)
+			5116, 				-- Concussive Shot			(Hunter)
+			13496, 				-- Dazed (aka "confuse")	(Druid, Hunter)        
+			17311, 				-- Mind Flay				(Priest)                               
+			2484, 				-- Earthbind				(Shaman)
+			8056, 				-- Frost Shock				(Shaman)
+			8034, 				-- Frostbrand Attack		(Shaman)
+			116, 				-- Frostbolt     			(Mage)
+			120, 				-- Cone of Cold				(Mage)
+			6136, 				-- Chilled 					(Mage)		
+			16094, 				-- Frost Breath 			(Mage)        
+			11113, 				-- Blast Wave				(Mage)
+			3604, 				-- Tendon Rip				(Unknown)
+		},
+		MagicSlowed = {        
+			2484, 				-- Earthbind				(Shaman)
+			8056, 				-- Frost Shock				(Shaman)
+			8034, 				-- Frostbrand Attack		(Shaman)				-- FIX ME: I AM NOT SURE 		
+			6136, 				-- Chilled 					(Mage)	 				-- FIX ME: I AM NOT SURE 
+			16094, 				-- Frost Breath 			(Mage)					-- FIX ME: I AM NOT SURE 
+			120, 				-- Cone of Cold 			(Mage)
+			116, 				-- Frostbolt     			(Mage)
+		},
+		BreakAble = {
+			5246, 				-- Intimidating Shout		(Warrior)
+			20066, 				-- Repentance				(Paladin)		
+			2637, 				-- Hibernate				(Druid)
+			118, 				-- Polymorph				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28270,				-- Polymorph: Cow			(Mage)
+			28272,				-- Polymorph: Pig			(Mage)
+			28271,				-- Polymorph: Turtle		(Mage)
+			1499, 				-- Freezing Trap			(Hunter)
+			19386, 				-- Wyvern Sting   			(Hunter)	
+			19503, 				-- Scatter Shot        		(Hunter)
+			6770, 				-- Sap 						(Rogue)
+			11297, 				-- Sap 						(Rogue)
+			2094, 				-- Blind					(Rogue) 
+			1776, 				-- Gouge					(Rogue)
+			5782, 				-- Fear						(Warlock)        
+			6215, 				-- Fear						(Warlock)        
+			6358, 				-- Seduction (pet)			(Warlock)                
+			5484, 				-- Howl of Terror			(Warlock)
+			8122, 				-- Psychic Scream			(Priest)      
+			9484, 				-- Shackle Undead 			(Priest)			
+			22641, 				-- Reckless Charge			(Item)			
+			700, 				-- Sleep					(Mage)			
+			1090, 				-- Sleep					(Mage)			
+			-- Rooted CC
+			--339, 				-- Entangling Roots			(Druid)
+			--122, 				-- Frost Nova				(Mage)
+		},
+		-- Imun Specific Buffs 
+		FearImun = {
+			18499, 				-- Berserker Rage 			(Warrior)
+			12328,				-- Death Wish				(Warrior)
+			1719,				-- Recklessness				(Warrior)
+			8143, 				-- Tremor Totem 			(Shaman)
+			6346,				-- Fear Ward				(Priest)		
+		},
+		FearImunDeBuffs = {
+			704,				-- Curse of Recklessness 	(Warlock)
+		},
+		StunImun = {
+			6615, 				-- Free Action 				(Free Action Potion)
+			24364,				-- Living Free Action		(Potion)
+			1953, 				-- Blink (micro buff)		(Mage)
+		},        
+		Freedom = {
+			6615, 				-- Free Action 				(Free Action Potion)
+			1044, 				-- Blessing of Freedom		(Paladin)
+			24364,				-- Living Free Action		(Potion)
+			9774,				-- Immune Root
+			425294,				-- Dispersion				(Priest)
+		},
+		TotalImun = {
+			710, 				-- Banish 					(Warlock)
+			498, 				-- Divine Protection		(Paladin)
+			642, 				-- Divine Shield			(Paladin)		
+			1020, 				-- Divine Shield			(Paladin)		
+			11958, 				-- Ice Block				(Mage)
+			20711, 				-- Spirit of Redemption		(Priest)
+			17624,				-- Petrification			(Flask of Petrification)
+			6724,				-- Light of Elune
+		},
+		DamagePhysImun = {		
+			1022, 				-- Blessing of Protection	(Paladin)
+			10278, 				-- Blessing of Protection	(Paladin)
+			3169,				-- Invulnerability			(Limited Invulnerability Potion)
+			3387,				-- Limited Invulnerability Potion
+			--16621,			-- Self Invulnerability (Invulnerable Mail weapon) -- FIX ME: seems only for swing attacks
+			6724,				-- Light of Elune
+			370391,				-- Failsafe Phylactery
+		},
+		DamageMagicImun = {
+			6724,				-- Light of Elune
+			370391,				-- Failsafe Phylactery
+		}, 
+		CCTotalImun = {},     
+		CCMagicImun = {
+			8178,				-- Grounding Totem Effect	(Shaman)
+		},
+		Reflect = { 
+			8178, 				-- Grounding Totem Effect	(Shaman)
+			23131, 				-- Frost Reflector			(Item)
+			23132, 				-- Shadow Reflector			(Item)
+			23097, 				-- Fire Reflector			(Item)
+		}, 
+		KickImun = {},
+		-- Purje 
+		ImportantPurje = {
+			1022, 				-- Blessing of Protection	(Paladin)
+			10278, 				-- Blessing of Protection	(Paladin)
+			20216, 				-- Divine Favor 			(Paladin)		
+			11129, 				-- Combustion 				(Mage)
+			12042, 				-- Arcane Power 			(Mage)
+			10060, 				-- Power Infusion			(Priest)
+			29166,				-- Innervate				(Druid)
+			2645, 				-- Ghost Wolf 				(Shaman)
+			16166, 				-- Elemental Mastery		(Shaman)
+			17730,				-- Major Spellstone			(Warlock)
+			17729,				-- Greater Spellstone		(Warlock)
+			128,				-- Spellstone				(Warlock)
+			18708,				-- Fel Domination			(Warlock)
+			18288,				-- Amplify Curse			(Warlock)		
+		},
+		SecondPurje = {
+			1044, 				-- Blessing of Freedom      (Paladin)  
+			-- We need purje druid only in bear form 
+			467,				-- Thorns					(Druid)
+			774, 				-- Rejuvenation				(Druid)
+			8936, 				-- Regrowth 				(Druid)
+			1126, 				-- Mark of the Wild			(Druid)
+		},
+		-- Speed 
+		Speed = {
+			2983, 				-- Sprint 					(Rogue)
+			2379, 				-- Speed 					(Swiftness Potion)
+			2645, 				-- Ghost Wolf 				(Shaman)
+			1850, 				-- Dash 					(Druid)
+			5118, 				-- Aspect of the Cheetah	(Hunter)       
+		},
+		-- Deff 
+		DeffBuffsMagic = {
+			8178, 				-- Grounding Totem Effect	(Shaman)
+			--498, 					-- Divine Protection		(Paladin)
+			--642, 					-- Divine Shield			(Paladin)
+			--11958, 				-- Ice Block				(Mage)
+			--19263, 				-- Deterrence    			(Hunter)
+			--20711, 				-- Spirit of Redemption		(Priest)		
+		}, 
+		DeffBuffs = {        
+			871,				-- ShieldWall				(Warrior)
+			20230,				-- Retaliation				(Warrior)
+			5277, 				-- Evasion					(Rogue)
+			1022, 				-- Blessing of Protection	(Paladin)
+			10278, 				-- Blessing of Protection	(Paladin)
+			22812,				-- Barkskin					(Druid)
+			3169,				-- Invulnerability			(Limited Invulnerability Potion)
+			3387,				-- Limited Invulnerability Potion
+			--498, 					-- Divine Protection		(Paladin)
+			--642, 					-- Divine Shield			(Paladin)
+			--11958, 				-- Ice Block				(Mage)
+			19263, 				-- Deterrence    			(Hunter)
+			--20711, 				-- Spirit of Redemption		(Priest)		
+		},  
+		SmallDeffBuffs = {
+			20594,				-- Stoneform				(Dwarf)
+			6940, 				-- Blessing of Sacrifice	(Paladin)
+		},
+		-- Damage buffs / debuffs
+		Rage = {
+			18499, 				-- Berserker Rage (Warrior)
+			12880, 				-- Enrage (Warrior)
+		}, 
+		DamageBuffs = {        
+			12328,				-- Death Wish 				(Warrior)		
+			1719,				-- Recklessness				(Warrior)
+			13877,				-- Blade Flurry				(Rogue)
+			13750,				-- Adrenaline Rush			(Rogue)
+			19574,				-- Bestial Wrath			(Hunter)
+			11129, 				-- Combustion 				(Mage)
+			12042, 				-- Arcane Power 			(Mage)
+			26297,				-- Berserking				(Troll)
+			20572,				-- Blood Fury				(Orc)
+			20007,				-- Holy Strength
+		},
+		DamageBuffs_Melee = {        
+			12328,				-- Death Wish 				(Warrior)	
+			1719,				-- Recklessness				(Warrior)
+			13750,				-- Adrenaline Rush			(Rogue)
+			13877,				-- Blade Flurry				(Rogue)		
+			20007,				-- Holy Strength
+		},
+		BurstHaste = {
+			19372, 				-- Ancient Hysteria 		(Unknown)
+			24185, 				-- Bloodlust 				(Unknown)
+		},
+		-- SOME SPECIAL
+		--DamageDeBuffs = {}, 
+		Flags = {
+			301091, 			-- Alliance flag
+			301089,  			-- Horde flag 
+			23333,				-- Warsong Flag
+			23335,  			-- Silverwing Flag
+		}, 
+		-- Cast Bars
+		Reshift = {
+			{118, 30}, 			-- Polymorph 				(Mage)
+			{19386, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
+		},
+		Premonition = {
+			{118, 30}, 			-- Polymorph 				(Mage)
+			{851, 20},			-- Polymorph: Sheep 		(Mage)
+			{28270, 30},		-- Polymorph: Cow	 		(Mage)
+			{28272, 30},		-- Polymorph: Pig	 		(Mage)
+			{28271, 30},		-- Polymorph: Turtle 		(Mage)
+			{24133, 35, 8},		-- Wyvern Sting (8 - 35)	(Hunter)
+			{5782, 20}, 		-- Fear 					(Warlock)        
+		},
+		CastBarsCC = {
+			118, 				-- Polymorph 				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28270,				-- Polymorph: Cow			(Mage)
+			20066, 				-- Repentance 				(Paladin)
+			24133, 				-- Wyvern Sting 			(Hunter)
+			5782, 				-- Fear 					(Warlock) 
+			5484, 				-- Howl of Terror   		(Warlock)
+			605, 				-- Mind Control 			(Priest)                 
+			9484, 				-- Shackle Undead 			(Priest) 
+		},
+		AllPvPKickCasts = {    
+			118, 				-- Polymorph 				(Mage)
+			851,				-- Polymorph: Sheep 		(Mage)
+			28270,				-- Polymorph: Cow			(Mage)
+			635,				-- Holy Light				(Paladin)
+			19750,				-- Flash of Light			(Paladin)
+			20066, 				-- Repentance 				(Paladin)		
+			5782, 				-- Fear 					(Warlock) 
+			19386, 				-- Wyvern Sting 			(Hunter)       
+			982, 				-- Revive Pet 				(Hunter)
+			605, 				-- Mind Control 			(Priest)  
+			9484, 				-- Shackle Undead 			(Priest) 
+			4526, 				-- Mass Dispel 				(Priest)	
+			596, 				-- Prayer of Healing		(Priest)
+			2060,				-- Greater Heal				(Priest)
+			2061,				-- Flash Heal				(Priest)
+			740, 				-- Tranquility				(Druid)
+			20484, 				-- Rebirth					(Druid)
+			25297,				-- Healing Touch			(Druid)
+			8936, 				-- Regrowth 				(Druid)
+			331,				-- Healing Wave				(Shaman)
+			1064,				-- Chain Heal				(Shaman)
+		},    
+	}
+end
 
 local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 	--__mode = "kv",
@@ -576,7 +2847,7 @@ local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 			if error_snippet then 
 				error("Unit.lua script tried to put in AssociativeTables 'nil' as index and it caused null table return. The script successfully found the first occurrence of the error stack in the TMW snippet: " .. error_snippet, 0)
 			else 
-				error("Unit.lua script tried to put in AssociativeTables 'nil' as index and it caused null table return. Failed to find TMW snippet stack error. Below must be shown level of stack 1.", 1)
+				error("Unit.lua script tried to put in AssociativeTables 'nil' as index and it caused null table return.\n" .. debugstack())
 			end 
 		end 
 		return t.NullTable
@@ -601,7 +2872,7 @@ local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 					end 
 				else -- Here is expected id of the spell always 
 					-- Put associatived spellName (@string)
-					local spellName = GetSpellInfo(val) 
+					local spellName = GetSpellName(val) 
 					if spellName then
 						t[v][spellName] = true 
 					end 
@@ -620,7 +2891,7 @@ local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 		
 		local spellName
 		for _, spellID in ipairs(AuraList[v]) do 
-			spellName = GetSpellInfo(spellID) 
+			spellName = GetSpellName(spellID) 
 			if spellName then 
 				t[v][spellName] = true 
 			end 
@@ -630,9 +2901,9 @@ local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 		-- Otherwise create new table and put spellName with spellID (if possible) for single entrance to keep return @table 
 		t[v] = {}
 				
-		--local spellName = GetSpellInfo(v_type == "string" and not v:find("%D") and toNum[v] or v) -- TMW lua code passing through 'thisobj.Name' @string type 
+		--local spellName = GetSpellName(v_type == "string" and not v:find("%D") and toNum[v] or v) -- TMW lua code passing through 'thisobj.Name' @string type 
 		-- Since Classic hasn't 'thisobj.Name' ways in profiles at all we will avoid use string functions 
-		local spellName = GetSpellInfo(v)
+		local spellName = GetSpellName(v)
 		if spellName then 
 			t[v][spellName] = true 
 		end 		 
@@ -647,47 +2918,47 @@ local AssociativeTables = setmetatable({ NullTable = {} }, { -- Only for Auras!
 end })
 
 -- Classic has always associative spellinput
---local IsMustBeByID = {}
---local function IsAuraEqual(spellName, spellID, spellInput, byID)
---	-- @return boolean 
---	if byID then 
---		if #spellInput > 0 then 				-- ArrayTables
---			for i = 1, #spellInput do 
---				if AuraList[spellInput[i]] then 
---					for _, auraListID in ipairs(AuraList[spellInput[i]]) do 
---						if spellID == auraListID then 
---							return true 
---						end 
---					end 
---				elseif spellID == spellInput[i] then 
---					return true 
---				end 
---			end
---		else 									-- AssociativeTables
---			return spellInput[spellID]
---		end 
---	else 
---		if #spellInput > 0 then 				-- ArrayTables
---			for i = 1, #spellInput do 
---				if AuraList[spellInput[i]] then 
---					for _, auraListID in ipairs(AuraList[spellInput[i]]) do 
---						if spellName == A_GetSpellInfo(auraListID) then 
---							return true 
---						end 
---					end 
---				elseif IsMustBeByID[spellInput[i]] then -- Retail only 
---					if spellID == spellInput[i] then 
---						return true 
---					end 
---				elseif spellName == A_GetSpellInfo(spellInput[i]) then 
---					return true 
---				end 
---			end 
---		else 									-- AssociativeTables
---			return spellInput[spellName]
---		end 
---	end 
---end
+local IsMustBeByID = {}
+local function IsAuraEqual(spellName, spellID, spellInput, byID)
+	-- @return boolean 
+	if byID then 
+		if #spellInput > 0 then 				-- ArrayTables
+			for i = 1, #spellInput do 
+				if AuraList[spellInput[i]] then 
+					for _, auraListID in ipairs(AuraList[spellInput[i]]) do 
+						if spellID == auraListID then 
+							return true 
+						end 
+					end 
+				elseif spellID == spellInput[i] then 
+					return true 
+				end 
+			end
+		else 									-- AssociativeTables
+			return spellInput[spellID]
+		end 
+	else 
+		if #spellInput > 0 then 				-- ArrayTables
+			for i = 1, #spellInput do 
+				if AuraList[spellInput[i]] then 
+					for _, auraListID in ipairs(AuraList[spellInput[i]]) do 
+						if spellName == A_GetSpellInfo(auraListID) then 
+							return true 
+						end 
+					end 
+				elseif IsMustBeByID[spellInput[i]] then -- Retail only 
+					if spellID == spellInput[i] then 
+						return true 
+					end 
+				elseif spellName == A_GetSpellInfo(spellInput[i]) then 
+					return true 
+				end 
+			end 
+		else 									-- AssociativeTables
+			return spellInput[spellName]
+		end 
+	end 
+end
 
 -------------------------------------------------------------------------------
 -- API: Core (Action Rotation Conditions)
@@ -750,30 +3021,272 @@ local Info = {
 	CacheStaying				= setmetatable({}, { __mode = "kv" }),
 	CacheInterrupt 				= setmetatable({}, { __mode = "kv" }),
 	SpecIs 						= {
-        ["MELEE"] 				= {103, 255, 70, 259, 260, 261, 263, 71, 72, 66, 73},
-        ["RANGE"] 				= {102, 253, 254, 62, 63, 64, 258, 262, 265, 266, 267},
-        ["HEALER"] 				= {105, 65, 256, 257, 264},
-        ["TANK"] 				= {103, 66, 73},
-        ["DAMAGER"] 			= {255, 70, 259, 260, 261, 263, 71, 72, 102, 253, 254, 62, 63, 64, 258, 262, 265, 266, 267},
+        ["MELEE"] 				= {251, 252, 577, 103, BuildToC >= 70003 and 255 or nil, 269, 70, 259, 260, 261, 263, 71, 72, 250, 581, 104, 268, 66, 73},
+        ["RANGE"] 				= {102, 253, 254, BuildToC < 70003 and 255 or nil, 62, 63, 64, 258, 262, 265, 266, 267},
+        ["HEALER"] 				= {105, 270, 65, 256, 257, 264, 1468, 1473},
+        ["TANK"] 				= {250, 581, 104, 268, 66, 73},
+        ["DAMAGER"] 			= {251, 252, 577, 103, 255, 269, 70, 259, 260, 261, 263, 71, 72, 102, 253, 254, 62, 63, 64, 258, 262, 265, 266, 267, 1467},
+    },
+	ClassSpecBuffs				= {
+		["WARRIOR"] 			= {
+			[CONST.WARRIOR_ARMS] = {
+				56638, 								-- Taste for Blood
+				64976, 								-- Juggernaut
+			}, 
+			[CONST.WARRIOR_FURY] = 29801, 			-- Rampage
+			[CONST.WARRIOR_PROTECTION] = 50227, 	-- Sword and Board
+		},
+		["PALADIN"]	= {
+			[CONST.PALADIN_RETRIBUTION] = 20375,	-- Seal of Command
+			[CONST.PALADIN_HOLY] = 31836,			-- Light's Grace
+			[CONST.PALADIN_PROTECTION] = 25781,		-- Righteous Fury
+		},
+		["HUNTER"] = {
+			[CONST.HUNTER_BEASTMASTERY] = 20895,	-- Spirit Bond
+			[CONST.HUNTER_MARKSMANSHIP] = 19506,	-- Trueshot Aura
+		},
+		["ROGUE"] = {
+			[CONST.ROGUE_SUBTLETY] = {
+				36554, 								-- Shadowstep
+				31223,								-- Master of Subtlety
+			},
+			[CONST.ROGUE_OUTLAW] = 51690,			-- Killing Spree
+		},
+		["PRIEST"] = {
+			[CONST.PRIEST_HOLY] = 47788,			-- Guardian Spirit
+			[CONST.PRIEST_DISCIPLINE] = 52800,		-- Borrowed Time
+			[CONST.PRIEST_SHADOW] = {
+				15473, 								-- Shadowform
+				15286,								-- Vampiric Embrace
+			},
+		},
+		["SHAMAN"] = {
+			[CONST.SHAMAN_ELEMENTAL] = {
+				57663,								-- Totem of Wrath
+				51470,								-- Elemental Oath
+			},
+			[CONST.SHAMAN_ENCHANCEMENT] = 30809,	-- Unleashed Rage
+			[CONST.SHAMAN_RESTORATION] = 49284,		-- Earth Shield
+		},
+		["MAGE"] = {
+			[CONST.MAGE_FROST] = 43039,				-- Ice Barrier
+			[CONST.MAGE_FIRE] = 11129,				-- Combustion
+			[CONST.MAGE_ARCANE] = 31583,			-- Arcane Empowerment
+		},
+		["WARLOCK"] = {
+			[CONST.WARLOCK_DESTRUCTION] = 30302,	-- Nether Protection
+		},
+		["DRUID"] = {
+			[CONST.DRUID_BALANCE] = 24907,			-- Moonkin Aura
+			[CONST.DRUID_FERAL] = 24932,			-- Leader of the Pack
+			[CONST.DRUID_RESTORATION] = 34123,		-- Tree of Life
+		},
+		["DEATHKNIGHT"] = {
+			[CONST.DEATHKNIGHT_UNHOLY] = 49222,		-- Bone Shield
+			[CONST.DEATHKNIGHT_FROST] = 55610,		-- Icy Talons
+			[CONST.DEATHKNIGHT_BLOOD] = {
+				49016,								-- Hysteria
+				53138,								-- Abomination's Might
+			},
+		},
+	},
+	ClassSpecSpells 			= {
+		["WARRIOR"]				= {
+			[CONST.WARRIOR_ARMS] = {
+				47486,								-- Mortal Strike
+				46924,								-- Bladestorm
+				56638, 								-- Taste for Blood
+				64976, 								-- Juggernaut
+			},
+			[CONST.WARRIOR_FURY] = {
+				23881,								-- Bloodthirst
+				29801, 								-- Rampage
+			},
+			[CONST.WARRIOR_PROTECTION] = {
+				47498,								-- Devastate
+				50227, 								-- Sword and Board
+			},
+		},
+		["PALADIN"]	= {
+			[CONST.PALADIN_RETRIBUTION] = {
+				35395,								-- Crusader Strike
+				53385,								-- Divine Storm
+				20066,								-- Repentance
+				20375,								-- Seal of Command
+			}, 
+			[CONST.PALADIN_HOLY] = {
+				48825,								-- Holy Shock
+				31836,								-- Light's Grace
+			},
+			[CONST.PALADIN_PROTECTION] = 48827,		-- Avenger's Shield
+		},
+		["HUNTER"] = {
+			[CONST.HUNTER_BEASTMASTERY] = {
+				19577,								-- Intimidation
+				20895,								-- Spirit Bond
+			},
+			[CONST.HUNTER_MARKSMANSHIP] = {
+				34490,								-- Silencing Shot
+				53209,								-- Chimera Shot
+				19506,								-- Trueshot Aura
+			},
+			[CONST.HUNTER_SURVIVAL] = {
+				60053,								-- Explosive Shot
+			},
+		},
+		["ROGUE"] = {
+			[CONST.ROGUE_ASSASSINATION] = 48666,	-- Mutilate
+			[CONST.ROGUE_OUTLAW] = {
+				51690, 								-- Killing Spree
+				13877,								-- Blade Flurry
+				13750,								-- Adrenaline Rush
+			},
+			[CONST.ROGUE_SUBTLETY] = {
+				48660,								-- Hemorrhage
+				36554, 								-- Shadowstep
+				31223,								-- Master of Subtlety
+			},
+		},
+		["PRIEST"] = {
+			[CONST.PRIEST_HOLY] = {
+				34861,								-- Circle of Healing
+				47788,								-- Guardian Spirit
+			},
+			[CONST.PRIEST_DISCIPLINE] = {
+				33206,								-- Pain Suppression
+				10060,								-- Power Infusion
+				53007,								-- Penance
+				52800,								-- Borrowed Time
+			},
+			[CONST.PRIEST_SHADOW] = {
+				15473, 								-- Shadowform
+				15286,								-- Vampiric Embrace
+				15487,								-- Silence
+				48160,								-- Vampiric Touch
+			},
+		},
+		["SHAMAN"] = {
+			[CONST.SHAMAN_ELEMENTAL] = {
+				57663,								-- Totem of Wrath
+				51470,								-- Elemental Oath
+				59159,								-- Thunderstorm
+				16166,								-- Elemental Mastery
+			},
+			[CONST.SHAMAN_ENCHANCEMENT] = {
+				30809,								-- Unleashed Rage
+				51533,								-- Feral Spirit
+				30823,								-- Shamanistic Rage
+				17364,								-- Stormstrike
+			},
+			[CONST.SHAMAN_RESTORATION] = {
+				49284,								-- Earth Shield
+				61301,								-- Riptide
+				51886,								-- Cleanse Spirit
+			},
+		},
+		["MAGE"] = {
+			[CONST.MAGE_FROST] = {
+				43039,								-- Ice Barrier
+				44572,								-- Deep Freeze
+			},
+			[CONST.MAGE_FIRE] = {
+				11129,								-- Combustion
+				42945,								-- Blast Wave
+				42950,								-- Dragon's Breath
+				55360,								-- Living Bomb
+			},
+			[CONST.MAGE_ARCANE] = {
+				31583,								-- Arcane Empowerment
+				44781,								-- Arcane Barrage
+			},
+		},
+		["WARLOCK"] = {
+			[CONST.WARLOCK_AFFLICTION] = {
+				59164,								-- Haunt
+				47843,								-- Unstable Affliction
+			},
+			[CONST.WARLOCK_DEMONOLOGY] = 59672,		-- Metamorphosis
+			[CONST.WARLOCK_DESTRUCTION] = {
+				30302,								-- Nether Protection
+				59172,								-- Chaos Bolt
+				47847,								-- Shadowfury
+			},
+		},
+		["DRUID"] = {
+			[CONST.DRUID_BALANCE] = {
+				24907,								-- Moonkin Aura
+				53201,								-- Starfall
+				61384,								-- Typhoon
+			},
+			[CONST.DRUID_FERAL] = {
+				24932,								-- Leader of the Pack
+				48566,								-- Mangle (Cat)
+				48564,								-- Mangle (Bear)
+			},
+			[CONST.DRUID_RESTORATION] = {
+				34123,								-- Tree of Life
+				18562,								-- Swiftmend
+			},
+		},
+		["DEATHKNIGHT"] = {
+			[CONST.DEATHKNIGHT_UNHOLY] = {
+				49222,								-- Bone Shield
+				55271,								-- Scourge Strike
+			},
+			[CONST.DEATHKNIGHT_FROST] = {
+				55610,								-- Icy Talons
+				55268,								-- Frost Strike
+				51411,								-- Howling Blast
+				49203,								-- Hungering Cold
+			},
+			[CONST.DEATHKNIGHT_BLOOD] = {
+				49016,								-- Hysteria
+				53138,								-- Abomination's Might
+				55262,								-- Heart Strike
+			},
+		},
+	},
+	ClassIsMelee = {
+        ["WARRIOR"] 			= true,
+        ["PALADIN"] 			= true,
+        ["HUNTER"] 				= false,
+        ["ROGUE"] 				= true,
+        ["PRIEST"] 				= false,
+        ["DEATHKNIGHT"] 		= true,
+        ["SHAMAN"] 				= false,
+        ["MAGE"] 				= false,
+        ["WARLOCK"] 			= false,
+        ["MONK"] 				= true,
+        ["DRUID"] 				= false,
+        ["DEMONHUNTER"] 		= true,
     },
 	ClassCanBeHealer			= {
 		["PALADIN"] 			= true,
 		["PRIEST"]				= true,
 		["SHAMAN"] 				= true,
-		["DRUID"] 				= true,	
+		["DRUID"] 				= true,
+		["MONK"]				= true,
+		["EVOKER"]				= true,
 	},
 	ClassCanBeTank				= {
-        ["WARRIOR"] 			= true,
-        ["PALADIN"] 			= true,
-        ["DRUID"] 				= true,	
-		["SHAMAN"]				= true, -- T3 tank in Classic possible 
+        ["WARRIOR"] 			= 71,						-- Defensive Stance
+        ["PALADIN"] 			= 25781, 					-- Righteous Fury
+        ["DRUID"] 				= {5487, 9634},				-- Bear Form, Dire Bear Form
+		["MONK"]				= true,
+		["SHAMAN"]				= BuildToC < 30000, 		-- T3 tank in Classic/TBC possible 
+		["DEMONHUNTER"]			= true,
+		["DEATHKNIGHT"]			= 48263,					-- Blood Presence		
 	},
 	ClassCanBeMelee				= {
         ["WARRIOR"] 			= true,
         ["PALADIN"] 			= true,
+		["HUNTER"]				= BuildToC >= 70003,
         ["ROGUE"] 				= true,
         ["SHAMAN"] 				= true,
-        ["DRUID"] 				= true,		
+        ["DRUID"] 				= true,
+		["MONK"]				= true,
+		["DEMONHUNTER"]			= true,
+		["DEATHKNIGHT"]			= true,
 	},
 	AllCC 						= {"Silenced", "Stuned", "Sleep", "Fear", "Disoriented", "Incapacitated"},
 	CreatureType				= setmetatable(
@@ -1012,62 +3525,62 @@ local Info = {
 				["Bird of Prey"]			= "Bird of Prey",			-- [26] Retail 
 				["Wind Serpent"]			= "Wind Serpent",			-- [27]
 				["Remote Control"]			= "Remote Control",			-- [28]
-				--["Felguard"]				= "Felguard",				-- [29]
-				--["Dragonhawk"]				= "Dragonhawk",				-- [30]
-				--["Ravager"]					= "Ravager",				-- [31]
-				--["Warp Stalker"]			= "Warp Stalker",			-- [32]
-				--["Sporebat"]				= "Sporebat",				-- [33]
-				--["Ray"]						= "Ray",					-- [34]
-				--["Serpent"]					= "Serpent",				-- [35]
-				--["Moth"]					= "Moth",					-- [37]
-				--["Chimaera"]				= "Chimaera",				-- [38]
-				--["Devilsaur"]				= "Devilsaur",				-- [39]
-				--["Ghoul"]					= "Ghoul",					-- [40]
-				--["Silithid"]				= "Silithid",				-- [41]
-				--["Worm"]					= "Worm",					-- [42]
-				--["Clefthoof"]				= "Clefthoof",				-- [43]
-				--["Wasp"]					= "Wasp",					-- [44]
-				--["Core Hound"]				= "Core Hound",				-- [45]
-				--["Spirit Beast"]			= "Spirit Beast",			-- [46]
-				--["Water Elemental"]			= "Water Elemental",		-- [49]
-				--["Fox"]						= "Fox",					-- [50]
-				--["Monkey"]					= "Monkey",					-- [51]
-				--["Dog"]						= "Dog",					-- [52]
-				--["Beetle"]					= "Beetle",					-- [53]
-				--["Shale Spider"]			= "Shale Spider",			-- [55]
-				--["Zombie"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Hydra"]					= "Hydra",					-- [68]
-				--["Fel Imp"]					= "Fel Imp",				-- [100]
-				--["Voidlord"]				= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Observer"]				= "Observer",				-- [103]
-				--["Wrathguard"]				= "Wrathguard",				-- [104]
-				--["Infernal"]				= "Infernal",				-- [108]
-				--["Fire Elemental"]			= "Fire Elemental",			-- [116]
-				--["Earth Elemental"]			= "Earth Elemental",		-- [117]
-				--["Crane"]					= "Crane",					-- [125]
-				--["Water Strider"]			= "Water Strider",			-- [126]
-				--["Rodent"]					= "Rodent",					-- [127]
-				--["Quilen"]					= "Quilen",					-- [128]
-				--["Goat"]					= "Goat",					-- [129]
-				--["Basilisk"]				= "Basilisk",				-- [130]
-				--["Direhorn"]				= "Direhorn",				-- [138]
-				--["Storm Elemental"]			= "Storm Elemental",		-- [145]
-				--["Terrorguard"]				= "Terrorguard",			-- [147]
-				--["Abyssal"]					= "Abyssal",				-- [148]
-				--["Riverbeast"]				= "Riverbeast",				-- [150]
-				--["Stag"]					= "Stag",					-- [151]
-				--["Mechanical"]				= "Mechanical",				-- [154]
-				--["Abomination"]				= "Abomination",			-- [155]
-				--["Scalehide"]				= "Scalehide",				-- [156]
-				--["Oxen"]					= "Oxen",					-- [157]
-				--["Feathermane"]				= "Feathermane",			-- [160]
-				--["Lizard"]					= "Lizard",					-- [288]
-				--["Pterrordax"]				= "Pterrordax",				-- [290]
-				--["Toad"]					= "Toad",					-- [291]
-				--["Krolusk"]					= "Krolusk",				-- [292]
-				--["Blood Beast"]				= "Blood Beast",			-- [296]
+				["Felguard"]				= "Felguard",				-- [29]
+				["Dragonhawk"]				= "Dragonhawk",				-- [30]
+				["Ravager"]					= "Ravager",				-- [31]
+				["Warp Stalker"]			= "Warp Stalker",			-- [32]
+				["Sporebat"]				= "Sporebat",				-- [33]
+				["Ray"]						= "Ray",					-- [34]
+				["Serpent"]					= "Serpent",				-- [35]
+				["Moth"]					= "Moth",					-- [37]
+				["Chimaera"]				= "Chimaera",				-- [38]
+				["Devilsaur"]				= "Devilsaur",				-- [39]
+				["Ghoul"]					= "Ghoul",					-- [40]
+				["Silithid"]				= "Silithid",				-- [41]
+				["Worm"]					= "Worm",					-- [42]
+				["Clefthoof"]				= "Clefthoof",				-- [43]
+				["Wasp"]					= "Wasp",					-- [44]
+				["Core Hound"]				= "Core Hound",				-- [45]
+				["Spirit Beast"]			= "Spirit Beast",			-- [46]
+				["Water Elemental"]			= "Water Elemental",		-- [49]
+				["Fox"]						= "Fox",					-- [50]
+				["Monkey"]					= "Monkey",					-- [51]
+				["Dog"]						= "Dog",					-- [52]
+				["Beetle"]					= "Beetle",					-- [53]
+				["Shale Spider"]			= "Shale Spider",			-- [55]
+				["Zombie"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Hydra"]					= "Hydra",					-- [68]
+				["Fel Imp"]					= "Fel Imp",				-- [100]
+				["Voidlord"]				= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Observer"]				= "Observer",				-- [103]
+				["Wrathguard"]				= "Wrathguard",				-- [104]
+				["Infernal"]				= "Infernal",				-- [108]
+				["Fire Elemental"]			= "Fire Elemental",			-- [116]
+				["Earth Elemental"]			= "Earth Elemental",		-- [117]
+				["Crane"]					= "Crane",					-- [125]
+				["Water Strider"]			= "Water Strider",			-- [126]
+				["Rodent"]					= "Rodent",					-- [127]
+				["Quilen"]					= "Quilen",					-- [128]
+				["Goat"]					= "Goat",					-- [129]
+				["Basilisk"]				= "Basilisk",				-- [130]
+				["Direhorn"]				= "Direhorn",				-- [138]
+				["Storm Elemental"]			= "Storm Elemental",		-- [145]
+				["Terrorguard"]				= "Terrorguard",			-- [147]
+				["Abyssal"]					= "Abyssal",				-- [148]
+				["Riverbeast"]				= "Riverbeast",				-- [150]
+				["Stag"]					= "Stag",					-- [151]
+				["Mechanical"]				= "Mechanical",				-- [154]
+				["Abomination"]				= "Abomination",			-- [155]
+				["Scalehide"]				= "Scalehide",				-- [156]
+				["Oxen"]					= "Oxen",					-- [157]
+				["Feathermane"]				= "Feathermane",			-- [160]
+				["Lizard"]					= "Lizard",					-- [288]
+				["Pterrordax"]				= "Pterrordax",				-- [290]
+				["Toad"]					= "Toad",					-- [291]
+				["Krolusk"]					= "Krolusk",				-- [292]
+				["Blood Beast"]				= "Blood Beast",			-- [296]
 			},
 			ruRU				= {
 				["Волк"]					= "Wolf",					-- [1]
@@ -1094,62 +3607,62 @@ local Info = {
 				["Хищная птица"]			= "Bird of Prey",			-- [26] Retail
 				["Крылатый змей"]			= "Wind Serpent",			-- [27]
 				["Управление"]				= "Remote Control",			-- [28]
-				--["Страж Скверны"]			= "Felguard",				-- [29]
-				--["Дракондор"]				= "Dragonhawk",				-- [30]
-				--["Опустошитель"]			= "Ravager",				-- [31]
-				--["Прыгуана"]				= "Warp Stalker",			-- [32]
-				--["Спороскат"]				= "Sporebat",				-- [33]
-				--["Скат"]					= "Ray",					-- [34]
-				--["Змей"]					= "Serpent",				-- [35]
-				--["Мотылек"]					= "Moth",					-- [37]
-				--["Химера"]					= "Chimaera",				-- [38]
-				--["Дьявозавр"]				= "Devilsaur",				-- [39]
-				--["Вурдалак"]				= "Ghoul",					-- [40]
-				--["Силитид"]					= "Silithid",				-- [41]
-				--["Червь"]					= "Worm",					-- [42]
-				--["Копытень"]				= "Clefthoof",				-- [43]
-				--["Оса"]						= "Wasp",					-- [44]
-				--["Гончая недр"]				= "Core Hound",				-- [45]
-				--["Дух зверя"]				= "Spirit Beast",			-- [46]
-				--["Элементаль воды"]			= "Water Elemental",		-- [49]
-				--["Лисица"]					= "Fox",					-- [50]
-				--["Обезьяна"]				= "Monkey",					-- [51]
-				--["Собака"]					= "Dog",					-- [52]
-				--["Жук"]						= "Beetle",					-- [53]
-				--["Сланцевый паук"]			= "Shale Spider",			-- [55]
-				--["Зомби"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Гидра"]					= "Hydra",					-- [68]
-				--["Бес Скверны"]				= "Fel Imp",				-- [100]
-				--["Повелитель Бездны"]		= "Voidlord",				-- [101]
-				--["Шиварра"]					= "Shivarra",				-- [102]
-				--["Наблюдатель"]				= "Observer",				-- [103]
-				--["Страж гнева"]				= "Wrathguard",				-- [104]
-				--["Инфернал"]				= "Infernal",				-- [108]
-				--["Элементаль огня"]			= "Fire Elemental",			-- [116]
-				--["Элементаль земли"]		= "Earth Elemental",		-- [117]
-				--["Журавль"]					= "Crane",					-- [125]
-				--["Водный долгоног"]			= "Water Strider",			-- [126]
-				--["Грызун"]					= "Rodent",					-- [127]
-				--["Цийлинь"]					= "Quilen",					-- [128]
-				--["Козел"]					= "Goat",					-- [129]
-				--["Василиск"]				= "Basilisk",				-- [130]
-				--["Дикорог"]					= "Direhorn",				-- [138]
-				--["Элементаль бури"]			= "Storm Elemental",		-- [145]
-				--["Стражник жути"]			= "Terrorguard",			-- [147]
-				--["Абиссал"]					= "Abyssal",				-- [148]
-				--["Речное чудище"]			= "Riverbeast",				-- [150]
-				--["Олень"]					= "Stag",					-- [151]
-				--["Механизм"]				= "Mechanical",				-- [154]
-				--["Поганище"]				= "Abomination",			-- [155]
-				--["Чешуешкурые"]				= "Scalehide",				-- [156]
-				--["Быки"]					= "Oxen",					-- [157]
-				--["Шерстоперые"]				= "Feathermane",			-- [160]
-				--["Ящерица"]					= "Lizard",					-- [288]
-				--["Терродактиль"]			= "Pterrordax",				-- [290]
-				--["Жаба"]					= "Toad",					-- [291]
-				--["Кролуск"]					= "Krolusk",				-- [292]
-				--["Кровавое чудовище"]		= "Blood Beast",			-- [296]
+				["Страж Скверны"]			= "Felguard",				-- [29]
+				["Дракондор"]				= "Dragonhawk",				-- [30]
+				["Опустошитель"]			= "Ravager",				-- [31]
+				["Прыгуана"]				= "Warp Stalker",			-- [32]
+				["Спороскат"]				= "Sporebat",				-- [33]
+				["Скат"]					= "Ray",					-- [34]
+				["Змей"]					= "Serpent",				-- [35]
+				["Мотылек"]					= "Moth",					-- [37]
+				["Химера"]					= "Chimaera",				-- [38]
+				["Дьявозавр"]				= "Devilsaur",				-- [39]
+				["Вурдалак"]				= "Ghoul",					-- [40]
+				["Силитид"]					= "Silithid",				-- [41]
+				["Червь"]					= "Worm",					-- [42]
+				["Копытень"]				= "Clefthoof",				-- [43]
+				["Оса"]						= "Wasp",					-- [44]
+				["Гончая недр"]				= "Core Hound",				-- [45]
+				["Дух зверя"]				= "Spirit Beast",			-- [46]
+				["Элементаль воды"]			= "Water Elemental",		-- [49]
+				["Лисица"]					= "Fox",					-- [50]
+				["Обезьяна"]				= "Monkey",					-- [51]
+				["Собака"]					= "Dog",					-- [52]
+				["Жук"]						= "Beetle",					-- [53]
+				["Сланцевый паук"]			= "Shale Spider",			-- [55]
+				["Зомби"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Гидра"]					= "Hydra",					-- [68]
+				["Бес Скверны"]				= "Fel Imp",				-- [100]
+				["Повелитель Бездны"]		= "Voidlord",				-- [101]
+				["Шиварра"]					= "Shivarra",				-- [102]
+				["Наблюдатель"]				= "Observer",				-- [103]
+				["Страж гнева"]				= "Wrathguard",				-- [104]
+				["Инфернал"]				= "Infernal",				-- [108]
+				["Элементаль огня"]			= "Fire Elemental",			-- [116]
+				["Элементаль земли"]		= "Earth Elemental",		-- [117]
+				["Журавль"]					= "Crane",					-- [125]
+				["Водный долгоног"]			= "Water Strider",			-- [126]
+				["Грызун"]					= "Rodent",					-- [127]
+				["Цийлинь"]					= "Quilen",					-- [128]
+				["Козел"]					= "Goat",					-- [129]
+				["Василиск"]				= "Basilisk",				-- [130]
+				["Дикорог"]					= "Direhorn",				-- [138]
+				["Элементаль бури"]			= "Storm Elemental",		-- [145]
+				["Стражник жути"]			= "Terrorguard",			-- [147]
+				["Абиссал"]					= "Abyssal",				-- [148]
+				["Речное чудище"]			= "Riverbeast",				-- [150]
+				["Олень"]					= "Stag",					-- [151]
+				["Механизм"]				= "Mechanical",				-- [154]
+				["Поганище"]				= "Abomination",			-- [155]
+				["Чешуешкурые"]				= "Scalehide",				-- [156]
+				["Быки"]					= "Oxen",					-- [157]
+				["Шерстоперые"]				= "Feathermane",			-- [160]
+				["Ящерица"]					= "Lizard",					-- [288]
+				["Терродактиль"]			= "Pterrordax",				-- [290]
+				["Жаба"]					= "Toad",					-- [291]
+				["Кролуск"]					= "Krolusk",				-- [292]
+				["Кровавое чудовище"]		= "Blood Beast",			-- [296]
 			},
 			frFR				= {
 				["Loup"]					= "Wolf",					-- [1]
@@ -1176,62 +3689,62 @@ local Info = {
 				["Oiseau de proie"]			= "Bird of Prey",			-- [26] Retail 
 				["Serpent des vents"]		= "Wind Serpent",			-- [27]
 				["Télécommande"]			= "Remote Control",			-- [28]
-				--["Gangregarde"]				= "Felguard",				-- [29]
-				--["Faucon-dragon"]			= "Dragonhawk",				-- [30]
-				--["Ravageur"]				= "Ravager",				-- [31]
-				--["Traqueur dim."]			= "Warp Stalker",			-- [32]
-				--["Sporoptère"]				= "Sporebat",				-- [33]
-				--["Raie"]					= "Ray",					-- [34]
-				--["Serpent"]					= "Serpent",				-- [35]
-				--["Phalène"]					= "Moth",					-- [37]
-				--["Chimère"]					= "Chimaera",				-- [38]
-				--["Diablosaure"]				= "Devilsaur",				-- [39]
-				--["Goule"]					= "Ghoul",					-- [40]
-				--["Silithide"]				= "Silithid",				-- [41]
-				--["Ver"]						= "Worm",					-- [42]
-				--["Sabot-fourchu"]			= "Clefthoof",				-- [43]
-				--["Guêpe"]					= "Wasp",					-- [44]
-				--["Chien du magma"]			= "Core Hound",				-- [45]
-				--["Esprit de bête"]			= "Spirit Beast",			-- [46]
-				--["Élémentaire d'eau"]		= "Water Elemental",		-- [49]
-				--["Renard"]					= "Fox",					-- [50]
-				--["Singe"]					= "Monkey",					-- [51]
-				--["Chien"]					= "Dog",					-- [52]
-				--["Hanneton"]				= "Beetle",					-- [53]
-				--["Araignée de schiste"]		= "Shale Spider",			-- [55]
-				--["Zombie"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Hydre"]					= "Hydra",					-- [68]
-				--["Diablotin gangrené"]		= "Fel Imp",				-- [100]
-				--["Seigneur du Vide"]		= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Observateur"]				= "Observer",				-- [103]
-				--["Garde-courroux"]			= "Wrathguard",				-- [104]
-				--["Infernal"]				= "Infernal",				-- [108]
-				--["Élémentaire de feu"]		= "Fire Elemental",			-- [116]
-				--["Élémentaire de terre"]	= "Earth Elemental",		-- [117]
-				--["Grue"]					= "Crane",					-- [125]
-				--["Trotteur aquatique"]		= "Water Strider",			-- [126]
-				--["Rongeur"]					= "Rodent",					-- [127]
-				--["Quilen"]					= "Quilen",					-- [128]
-				--["Chèvre"]					= "Goat",					-- [129]
-				--["Basilic"]					= "Basilisk",				-- [130]
-				--["Navrecorne"]				= "Direhorn",				-- [138]
-				--["Élém. de tempête"]		= "Storm Elemental",		-- [145]
-				--["Garde de terreur"]		= "Terrorguard",			-- [147]
-				--["Abyssal"]					= "Abyssal",				-- [148]
-				--["Potamodonte"]				= "Riverbeast",				-- [150]
-				--["Cerf"]					= "Stag",					-- [151]
-				--["Mécanique"]				= "Mechanical",				-- [154]
-				--["Abomination"]				= "Abomination",			-- [155]
-				--["Peau écailleuse"]			= "Scalehide",				-- [156]
-				--["Bovin"]					= "Oxen",					-- [157]
-				--["Crin-de-plume"]			= "Feathermane",			-- [160]
-				--["Lézard"]					= "Lizard",					-- [288]
-				--["Pterreurdactyle"]			= "Pterrordax",				-- [290]
-				--["Crapaud"]					= "Toad",					-- [291]
-				--["Krolusk"]					= "Krolusk",				-- [292]
-				--["Bête de sang"]			= "Blood Beast",			-- [296]
+				["Gangregarde"]				= "Felguard",				-- [29]
+				["Faucon-dragon"]			= "Dragonhawk",				-- [30]
+				["Ravageur"]				= "Ravager",				-- [31]
+				["Traqueur dim."]			= "Warp Stalker",			-- [32]
+				["Sporoptère"]				= "Sporebat",				-- [33]
+				["Raie"]					= "Ray",					-- [34]
+				["Serpent"]					= "Serpent",				-- [35]
+				["Phalène"]					= "Moth",					-- [37]
+				["Chimère"]					= "Chimaera",				-- [38]
+				["Diablosaure"]				= "Devilsaur",				-- [39]
+				["Goule"]					= "Ghoul",					-- [40]
+				["Silithide"]				= "Silithid",				-- [41]
+				["Ver"]						= "Worm",					-- [42]
+				["Sabot-fourchu"]			= "Clefthoof",				-- [43]
+				["Guêpe"]					= "Wasp",					-- [44]
+				["Chien du magma"]			= "Core Hound",				-- [45]
+				["Esprit de bête"]			= "Spirit Beast",			-- [46]
+				["Élémentaire d'eau"]		= "Water Elemental",		-- [49]
+				["Renard"]					= "Fox",					-- [50]
+				["Singe"]					= "Monkey",					-- [51]
+				["Chien"]					= "Dog",					-- [52]
+				["Hanneton"]				= "Beetle",					-- [53]
+				["Araignée de schiste"]		= "Shale Spider",			-- [55]
+				["Zombie"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Hydre"]					= "Hydra",					-- [68]
+				["Diablotin gangrené"]		= "Fel Imp",				-- [100]
+				["Seigneur du Vide"]		= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Observateur"]				= "Observer",				-- [103]
+				["Garde-courroux"]			= "Wrathguard",				-- [104]
+				["Infernal"]				= "Infernal",				-- [108]
+				["Élémentaire de feu"]		= "Fire Elemental",			-- [116]
+				["Élémentaire de terre"]	= "Earth Elemental",		-- [117]
+				["Grue"]					= "Crane",					-- [125]
+				["Trotteur aquatique"]		= "Water Strider",			-- [126]
+				["Rongeur"]					= "Rodent",					-- [127]
+				["Quilen"]					= "Quilen",					-- [128]
+				["Chèvre"]					= "Goat",					-- [129]
+				["Basilic"]					= "Basilisk",				-- [130]
+				["Navrecorne"]				= "Direhorn",				-- [138]
+				["Élém. de tempête"]		= "Storm Elemental",		-- [145]
+				["Garde de terreur"]		= "Terrorguard",			-- [147]
+				["Abyssal"]					= "Abyssal",				-- [148]
+				["Potamodonte"]				= "Riverbeast",				-- [150]
+				["Cerf"]					= "Stag",					-- [151]
+				["Mécanique"]				= "Mechanical",				-- [154]
+				["Abomination"]				= "Abomination",			-- [155]
+				["Peau écailleuse"]			= "Scalehide",				-- [156]
+				["Bovin"]					= "Oxen",					-- [157]
+				["Crin-de-plume"]			= "Feathermane",			-- [160]
+				["Lézard"]					= "Lizard",					-- [288]
+				["Pterreurdactyle"]			= "Pterrordax",				-- [290]
+				["Crapaud"]					= "Toad",					-- [291]
+				["Krolusk"]					= "Krolusk",				-- [292]
+				["Bête de sang"]			= "Blood Beast",			-- [296]
 			},
 			deDE				= {
 				["Wolf"]					= "Wolf",					-- [1]
@@ -1258,62 +3771,62 @@ local Info = {
 				["Raubvogel"]				= "Bird of Prey",			-- [26] Retail
 				["Windnatter"]				= "Wind Serpent",			-- [27]
 				["Ferngesteuert"]			= "Remote Control",			-- [28]
-				--["Teufelswache"]			= "Felguard",				-- [29]
-				--["Drachenfalke"]			= "Dragonhawk",				-- [30]
-				--["Felshetzer"]				= "Ravager",				-- [31]
-				--["Sphärenjäger"]			= "Warp Stalker",			-- [32]
-				--["Sporensegler"]			= "Sporebat",				-- [33]
-				--["Rochen"]					= "Ray",					-- [34]
-				--["Schlange"]				= "Serpent",				-- [35]
-				--["Motte"]					= "Moth",					-- [37]
-				--["Schimäre"]				= "Chimaera",				-- [38]
-				--["Teufelssaurier"]			= "Devilsaur",				-- [39]
-				--["Ghul"]					= "Ghoul",					-- [40]
-				--["Silithid"]				= "Silithid",				-- [41]
-				--["Wurm"]					= "Worm",					-- [42]
-				--["Grollhuf"]				= "Clefthoof",				-- [43]
-				--["Wespe"]					= "Wasp",					-- [44]
-				--["Kernhund"]				= "Core Hound",				-- [45]
-				--["Geisterbestie"]			= "Spirit Beast",			-- [46]
-				--["Wasserelementar"]			= "Water Elemental",		-- [49]
-				--["Fuchs"]					= "Fox",					-- [50]
-				--["Affe"]					= "Monkey",					-- [51]
-				--["Hund"]					= "Dog",					-- [52]
-				--["Käfer"]					= "Beetle",					-- [53]
-				--["Schieferspinne"]			= "Shale Spider",			-- [55]
-				--["Zombie"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Hydra"]					= "Hydra",					-- [68]
-				--["Teufelswichtel"]			= "Fel Imp",				-- [100]
-				--["Leerenfürst"]				= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Beobachter"]				= "Observer",				-- [103]
-				--["Zornwächter"]				= "Wrathguard",				-- [104]
-				--["Höllenbestie"]			= "Infernal",				-- [108]
-				--["Feuerelementar"]			= "Fire Elemental",			-- [116]
-				--["Erdelementar"]			= "Earth Elemental",		-- [117]
-				--["Kranich"]					= "Crane",					-- [125]
-				--["Wasserschreiter"]			= "Water Strider",			-- [126]
-				--["Nager"]					= "Rodent",					-- [127]
-				--["Qilen"]					= "Quilen",					-- [128]
-				--["Ziege"]					= "Goat",					-- [129]
-				--["Basilisk"]				= "Basilisk",				-- [130]
-				--["Terrorhorn"]				= "Direhorn",				-- [138]
-				--["Sturmelementar"]			= "Storm Elemental",		-- [145]
-				--["Terrorwache"]				= "Terrorguard",			-- [147]
-				--["Abyssal"]					= "Abyssal",				-- [148]
-				--["Flussbestie"]				= "Riverbeast",				-- [150]
-				--["Hirsch"]					= "Stag",					-- [151]
-				--["Mechanisch"]				= "Mechanical",				-- [154]
-				--["Monstrosität"]			= "Abomination",			-- [155]
-				--["Schuppenbalg"]			= "Scalehide",				-- [156]
-				--["Ochse"]					= "Oxen",					-- [157]
-				--["Federmähnen"]				= "Feathermane",			-- [160]
-				--["Echse"]					= "Lizard",					-- [288]
-				--["Pterrordax"]				= "Pterrordax",				-- [290]
-				--["Kröte"]					= "Toad",					-- [291]
-				--["Krolusk"]					= "Krolusk",				-- [292]
-				--["Blutbestie"]				= "Blood Beast",			-- [296]
+				["Teufelswache"]			= "Felguard",				-- [29]
+				["Drachenfalke"]			= "Dragonhawk",				-- [30]
+				["Felshetzer"]				= "Ravager",				-- [31]
+				["Sphärenjäger"]			= "Warp Stalker",			-- [32]
+				["Sporensegler"]			= "Sporebat",				-- [33]
+				["Rochen"]					= "Ray",					-- [34]
+				["Schlange"]				= "Serpent",				-- [35]
+				["Motte"]					= "Moth",					-- [37]
+				["Schimäre"]				= "Chimaera",				-- [38]
+				["Teufelssaurier"]			= "Devilsaur",				-- [39]
+				["Ghul"]					= "Ghoul",					-- [40]
+				["Silithid"]				= "Silithid",				-- [41]
+				["Wurm"]					= "Worm",					-- [42]
+				["Grollhuf"]				= "Clefthoof",				-- [43]
+				["Wespe"]					= "Wasp",					-- [44]
+				["Kernhund"]				= "Core Hound",				-- [45]
+				["Geisterbestie"]			= "Spirit Beast",			-- [46]
+				["Wasserelementar"]			= "Water Elemental",		-- [49]
+				["Fuchs"]					= "Fox",					-- [50]
+				["Affe"]					= "Monkey",					-- [51]
+				["Hund"]					= "Dog",					-- [52]
+				["Käfer"]					= "Beetle",					-- [53]
+				["Schieferspinne"]			= "Shale Spider",			-- [55]
+				["Zombie"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Hydra"]					= "Hydra",					-- [68]
+				["Teufelswichtel"]			= "Fel Imp",				-- [100]
+				["Leerenfürst"]				= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Beobachter"]				= "Observer",				-- [103]
+				["Zornwächter"]				= "Wrathguard",				-- [104]
+				["Höllenbestie"]			= "Infernal",				-- [108]
+				["Feuerelementar"]			= "Fire Elemental",			-- [116]
+				["Erdelementar"]			= "Earth Elemental",		-- [117]
+				["Kranich"]					= "Crane",					-- [125]
+				["Wasserschreiter"]			= "Water Strider",			-- [126]
+				["Nager"]					= "Rodent",					-- [127]
+				["Qilen"]					= "Quilen",					-- [128]
+				["Ziege"]					= "Goat",					-- [129]
+				["Basilisk"]				= "Basilisk",				-- [130]
+				["Terrorhorn"]				= "Direhorn",				-- [138]
+				["Sturmelementar"]			= "Storm Elemental",		-- [145]
+				["Terrorwache"]				= "Terrorguard",			-- [147]
+				["Abyssal"]					= "Abyssal",				-- [148]
+				["Flussbestie"]				= "Riverbeast",				-- [150]
+				["Hirsch"]					= "Stag",					-- [151]
+				["Mechanisch"]				= "Mechanical",				-- [154]
+				["Monstrosität"]			= "Abomination",			-- [155]
+				["Schuppenbalg"]			= "Scalehide",				-- [156]
+				["Ochse"]					= "Oxen",					-- [157]
+				["Federmähnen"]				= "Feathermane",			-- [160]
+				["Echse"]					= "Lizard",					-- [288]
+				["Pterrordax"]				= "Pterrordax",				-- [290]
+				["Kröte"]					= "Toad",					-- [291]
+				["Krolusk"]					= "Krolusk",				-- [292]
+				["Blutbestie"]				= "Blood Beast",			-- [296]
 			},
 			esES				= {
 				["Lobo"]					= "Wolf",					-- [1]
@@ -1343,68 +3856,68 @@ local Info = {
 				["Dragón alado"]			= "Wind Serpent",			-- [27] Spain 
 				["Serpiente alada"]			= "Wind Serpent",			-- [27] Mexico 
 				["Control remoto"]			= "Remote Control",			-- [28]
-				--["Guardia vil"]				= "Felguard",				-- [29]
-				--["Dracohalcón"]				= "Dragonhawk",				-- [30]
-				--["Devastador"]				= "Ravager",				-- [31]
-				--["Acechador deformado"]		= "Warp Stalker",			-- [32]
-				--["Esporiélago"]				= "Sporebat",				-- [33]
-				--["Raya"]					= "Ray",					-- [34] Spain
-				--["Mantarraya"]				= "Ray",					-- [34] Mexico
-				--["Serpiente"]				= "Serpent",				-- [35]
-				--["Palomilla"]				= "Moth",					-- [37]
-				--["Quimera"]					= "Chimaera",				-- [38]
-				--["Demosaurio"]				= "Devilsaur",				-- [39]
-				--["Necrófago"]				= "Ghoul",					-- [40]
-				--["Silítido"]				= "Silithid",				-- [41]
-				--["Gusano"]					= "Worm",					-- [42]
-				--["Uñagrieta"]				= "Clefthoof",				-- [43]
-				--["Avispa"]					= "Wasp",					-- [44]
-				--["Can del Núcleo"]			= "Core Hound",				-- [45]
-				--["Bestia espíritu"]			= "Spirit Beast",			-- [46]
-				--["Elemental de agua"]		= "Water Elemental",		-- [49]
-				--["Zorro"]					= "Fox",					-- [50]
-				--["Mono"]					= "Monkey",					-- [51]
-				--["Perro"]					= "Dog",					-- [52]
-				--["Alfazaque"]				= "Beetle",					-- [53]
-				--["Araña de esquisto"]		= "Shale Spider",			-- [55]
-				--["Zombi"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Hidra"]					= "Hydra",					-- [68]
-				--["Diablillo vil"]			= "Fel Imp",				-- [100]
-				--["Señor del Vacío"]			= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Observador"]				= "Observer",				-- [103]
-				--["Guardia de cólera"]		= "Wrathguard",				-- [104]
-				--["Infernal"]				= "Infernal",				-- [108]
-				--["Elemental de fuego"]		= "Fire Elemental",			-- [116]
-				--["Elemental de tierra"]		= "Earth Elemental",		-- [117]
-				--["Grulla"]					= "Crane",					-- [125]
-				--["Zancudo acuático"]		= "Water Strider",			-- [126]
-				--["Roedor"]					= "Rodent",					-- [127]
-				--["Quilen"]					= "Quilen",					-- [128]
-				--["Cabra"]					= "Goat",					-- [129]
-				--["Basilisco"]				= "Basilisk",				-- [130]
-				--["Cuernoatroz"]				= "Direhorn",				-- [138]
-				--["Elem. de tormenta"]		= "Storm Elemental",		-- [145] Spain
-				--["Elemental tormenta"]		= "Storm Elemental",		-- [145] Mexico 
-				--["Guarda terrorífico"]		= "Terrorguard",			-- [147]
-				--["Abisal"]					= "Abyssal",				-- [148]
-				--["Bestia fluvial"]			= "Riverbeast",				-- [150] Spain 
-				--["Bestia del río"]			= "Riverbeast",				-- [150] Mexico
-				--["Venado"]					= "Stag",					-- [151]
-				--["Máquina"]					= "Mechanical",				-- [154] Spain 
-				--["Mecánico"]				= "Mechanical",				-- [154] Mexico
-				--["Abominación"]				= "Abomination",			-- [155]
-				--["Pielescama"]				= "Scalehide",				-- [156]
-				--["Buey"]					= "Oxen",					-- [157]
-				--["Cuellipluma"]				= "Feathermane",			-- [160] Spain 
-				--["Crinpluma"]				= "Feathermane",			-- [160] Mexico
-				--["Lagarto"]					= "Lizard",					-- [288]
-				--["Pterrordáctilo"]			= "Pterrordax",				-- [290]
-				--["Sapo"]					= "Toad",					-- [291]
-				--["Crolusco"]				= "Krolusk",				-- [292] Spain 
-				--["Krolusko"]				= "Krolusk",				-- [292] Maxico
-				--["Bestia de sangre"]		= "Blood Beast",			-- [296]
+				["Guardia vil"]				= "Felguard",				-- [29]
+				["Dracohalcón"]				= "Dragonhawk",				-- [30]
+				["Devastador"]				= "Ravager",				-- [31]
+				["Acechador deformado"]		= "Warp Stalker",			-- [32]
+				["Esporiélago"]				= "Sporebat",				-- [33]
+				["Raya"]					= "Ray",					-- [34] Spain
+				["Mantarraya"]				= "Ray",					-- [34] Mexico
+				["Serpiente"]				= "Serpent",				-- [35]
+				["Palomilla"]				= "Moth",					-- [37]
+				["Quimera"]					= "Chimaera",				-- [38]
+				["Demosaurio"]				= "Devilsaur",				-- [39]
+				["Necrófago"]				= "Ghoul",					-- [40]
+				["Silítido"]				= "Silithid",				-- [41]
+				["Gusano"]					= "Worm",					-- [42]
+				["Uñagrieta"]				= "Clefthoof",				-- [43]
+				["Avispa"]					= "Wasp",					-- [44]
+				["Can del Núcleo"]			= "Core Hound",				-- [45]
+				["Bestia espíritu"]			= "Spirit Beast",			-- [46]
+				["Elemental de agua"]		= "Water Elemental",		-- [49]
+				["Zorro"]					= "Fox",					-- [50]
+				["Mono"]					= "Monkey",					-- [51]
+				["Perro"]					= "Dog",					-- [52]
+				["Alfazaque"]				= "Beetle",					-- [53]
+				["Araña de esquisto"]		= "Shale Spider",			-- [55]
+				["Zombi"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Hidra"]					= "Hydra",					-- [68]
+				["Diablillo vil"]			= "Fel Imp",				-- [100]
+				["Señor del Vacío"]			= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Observador"]				= "Observer",				-- [103]
+				["Guardia de cólera"]		= "Wrathguard",				-- [104]
+				["Infernal"]				= "Infernal",				-- [108]
+				["Elemental de fuego"]		= "Fire Elemental",			-- [116]
+				["Elemental de tierra"]		= "Earth Elemental",		-- [117]
+				["Grulla"]					= "Crane",					-- [125]
+				["Zancudo acuático"]		= "Water Strider",			-- [126]
+				["Roedor"]					= "Rodent",					-- [127]
+				["Quilen"]					= "Quilen",					-- [128]
+				["Cabra"]					= "Goat",					-- [129]
+				["Basilisco"]				= "Basilisk",				-- [130]
+				["Cuernoatroz"]				= "Direhorn",				-- [138]
+				["Elem. de tormenta"]		= "Storm Elemental",		-- [145] Spain
+				["Elemental tormenta"]		= "Storm Elemental",		-- [145] Mexico 
+				["Guarda terrorífico"]		= "Terrorguard",			-- [147]
+				["Abisal"]					= "Abyssal",				-- [148]
+				["Bestia fluvial"]			= "Riverbeast",				-- [150] Spain 
+				["Bestia del río"]			= "Riverbeast",				-- [150] Mexico
+				["Venado"]					= "Stag",					-- [151]
+				["Máquina"]					= "Mechanical",				-- [154] Spain 
+				["Mecánico"]				= "Mechanical",				-- [154] Mexico
+				["Abominación"]				= "Abomination",			-- [155]
+				["Pielescama"]				= "Scalehide",				-- [156]
+				["Buey"]					= "Oxen",					-- [157]
+				["Cuellipluma"]				= "Feathermane",			-- [160] Spain 
+				["Crinpluma"]				= "Feathermane",			-- [160] Mexico
+				["Lagarto"]					= "Lizard",					-- [288]
+				["Pterrordáctilo"]			= "Pterrordax",				-- [290]
+				["Sapo"]					= "Toad",					-- [291]
+				["Crolusco"]				= "Krolusk",				-- [292] Spain 
+				["Krolusko"]				= "Krolusk",				-- [292] Maxico
+				["Bestia de sangre"]		= "Blood Beast",			-- [296]
 			},
 			ptPT				= {
 				["Lobo"]					= "Wolf",					-- [1]
@@ -1431,62 +3944,62 @@ local Info = {
 				["Ave de Rapina"]			= "Bird of Prey",			-- [26] Retail
 				["Serpente Alada"]			= "Wind Serpent",			-- [27]
 				["Controle Remoto"]			= "Remote Control",			-- [28]
-				--["Guarda Vil"]				= "Felguard",				-- [29]
-				--["Falcodrago"]				= "Dragonhawk",				-- [30]
-				--["Assolador"]				= "Ravager",				-- [31]
-				--["Espreitador Dimens."]		= "Warp Stalker",			-- [32]
-				--["Quirósporo"]				= "Sporebat",				-- [33]
-				--["Arraia"]					= "Ray",					-- [34]
-				--["Serpente"]				= "Serpent",				-- [35]
-				--["Mariposa"]				= "Moth",					-- [37]
-				--["Quimera"]					= "Chimaera",				-- [38]
-				--["Demossauro"]				= "Devilsaur",				-- [39]
-				--["Carniçal"]				= "Ghoul",					-- [40]
-				--["Silitídeo"]				= "Silithid",				-- [41]
-				--["Verme"]					= "Worm",					-- [42]
-				--["Fenoceronte"]				= "Clefthoof",				-- [43]
-				--["Vespa"]					= "Wasp",					-- [44]
-				--["Cão-magma"]				= "Core Hound",				-- [45]
-				--["Fera Espiritual"]			= "Spirit Beast",			-- [46]
-				--["Elemental da Água"]		= "Water Elemental",		-- [49]
-				--["Raposa"]					= "Fox",					-- [50]
-				--["Macaco"]					= "Monkey",					-- [51]
-				--["Cachorro"]				= "Dog",					-- [52]
-				--["Besouro"]					= "Beetle",					-- [53]
-				--["Aranha Xistosa"]			= "Shale Spider",			-- [55]
-				--["Zumbi"]					= "Zombie",					-- [56]
-				--["Beetle <zzOLD>"]			= "<< QA TEST FAMILY >>",	-- [57]
-				--["Hidra"]					= "Hydra",					-- [68]
-				--["Diabrete Vil"]			= "Fel Imp",				-- [100]
-				--["Senhor do Caos"]			= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Observador"]				= "Observer",				-- [103]
-				--["Guardião Colérico"]		= "Wrathguard",				-- [104]
-				--["Infernal"]				= "Infernal",				-- [108]
-				--["Elemental do Fogo"]		= "Fire Elemental",			-- [116]
-				--["Elemental da Terra"]		= "Earth Elemental",		-- [117]
-				--["Garça"]					= "Crane",					-- [125]
-				--["Caminhante das Águas"]	= "Water Strider",			-- [126]
-				--["Roedor"]					= "Rodent",					-- [127]
-				--["Quílen"]					= "Quilen",					-- [128]
-				--["Bode"]					= "Goat",					-- [129]
-				--["Basilisco"]				= "Basilisk",				-- [130]
-				--["Escornante"]				= "Direhorn",				-- [138]
-				--["Elemental Tempestade"]	= "Storm Elemental",		-- [145]
-				--["Deimoguarda"]				= "Terrorguard",			-- [147]
-				--["Abissal"]					= "Abyssal",				-- [148]
-				--["Fera-do-rio"]				= "Riverbeast",				-- [150]
-				--["Cervo"]					= "Stag",					-- [151]
-				--["Mecânico"]				= "Mechanical",				-- [154]
-				--["Abominação"]				= "Abomination",			-- [155]
-				--["Courescama"]				= "Scalehide",				-- [156]
-				--["Boi"]						= "Oxen",					-- [157]
-				--["Aquifélix"]				= "Feathermane",			-- [160]
-				--["Lagarto"]					= "Lizard",					-- [288]
-				--["Pterrordax"]				= "Pterrordax",				-- [290]
-				--["Sapo"]					= "Toad",					-- [291]
-				--["Crolusco"]				= "Krolusk",				-- [292]
-				--["Fera Sangrenta"]			= "Blood Beast",			-- [296]
+				["Guarda Vil"]				= "Felguard",				-- [29]
+				["Falcodrago"]				= "Dragonhawk",				-- [30]
+				["Assolador"]				= "Ravager",				-- [31]
+				["Espreitador Dimens."]		= "Warp Stalker",			-- [32]
+				["Quirósporo"]				= "Sporebat",				-- [33]
+				["Arraia"]					= "Ray",					-- [34]
+				["Serpente"]				= "Serpent",				-- [35]
+				["Mariposa"]				= "Moth",					-- [37]
+				["Quimera"]					= "Chimaera",				-- [38]
+				["Demossauro"]				= "Devilsaur",				-- [39]
+				["Carniçal"]				= "Ghoul",					-- [40]
+				["Silitídeo"]				= "Silithid",				-- [41]
+				["Verme"]					= "Worm",					-- [42]
+				["Fenoceronte"]				= "Clefthoof",				-- [43]
+				["Vespa"]					= "Wasp",					-- [44]
+				["Cão-magma"]				= "Core Hound",				-- [45]
+				["Fera Espiritual"]			= "Spirit Beast",			-- [46]
+				["Elemental da Água"]		= "Water Elemental",		-- [49]
+				["Raposa"]					= "Fox",					-- [50]
+				["Macaco"]					= "Monkey",					-- [51]
+				["Cachorro"]				= "Dog",					-- [52]
+				["Besouro"]					= "Beetle",					-- [53]
+				["Aranha Xistosa"]			= "Shale Spider",			-- [55]
+				["Zumbi"]					= "Zombie",					-- [56]
+				["Beetle <zzOLD>"]			= "<< QA TEST FAMILY >>",	-- [57]
+				["Hidra"]					= "Hydra",					-- [68]
+				["Diabrete Vil"]			= "Fel Imp",				-- [100]
+				["Senhor do Caos"]			= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Observador"]				= "Observer",				-- [103]
+				["Guardião Colérico"]		= "Wrathguard",				-- [104]
+				["Infernal"]				= "Infernal",				-- [108]
+				["Elemental do Fogo"]		= "Fire Elemental",			-- [116]
+				["Elemental da Terra"]		= "Earth Elemental",		-- [117]
+				["Garça"]					= "Crane",					-- [125]
+				["Caminhante das Águas"]	= "Water Strider",			-- [126]
+				["Roedor"]					= "Rodent",					-- [127]
+				["Quílen"]					= "Quilen",					-- [128]
+				["Bode"]					= "Goat",					-- [129]
+				["Basilisco"]				= "Basilisk",				-- [130]
+				["Escornante"]				= "Direhorn",				-- [138]
+				["Elemental Tempestade"]	= "Storm Elemental",		-- [145]
+				["Deimoguarda"]				= "Terrorguard",			-- [147]
+				["Abissal"]					= "Abyssal",				-- [148]
+				["Fera-do-rio"]				= "Riverbeast",				-- [150]
+				["Cervo"]					= "Stag",					-- [151]
+				["Mecânico"]				= "Mechanical",				-- [154]
+				["Abominação"]				= "Abomination",			-- [155]
+				["Courescama"]				= "Scalehide",				-- [156]
+				["Boi"]						= "Oxen",					-- [157]
+				["Aquifélix"]				= "Feathermane",			-- [160]
+				["Lagarto"]					= "Lizard",					-- [288]
+				["Pterrordax"]				= "Pterrordax",				-- [290]
+				["Sapo"]					= "Toad",					-- [291]
+				["Crolusco"]				= "Krolusk",				-- [292]
+				["Fera Sangrenta"]			= "Blood Beast",			-- [296]
 			},			
 			itIT				= {
 				["Lupo"]					= "Wolf",					-- [1]
@@ -1512,313 +4025,313 @@ local Info = {
 				["Rapace"]					= "Bird of Prey",			-- [26]
 				["Serpente Volante"]		= "Wind Serpent",			-- [27]
 				["Controllo a Distanza"]	= "Remote Control",			-- [28]
-				--["Vilguardia"]				= "Felguard",				-- [29]
-				--["Dragofalco"]				= "Dragonhawk",				-- [30]
-				--["Devastatore"]				= "Ravager",				-- [31]
-				--["Segugio Distorcente"]		= "Warp Stalker",			-- [32]
-				--["Sporofago"]				= "Sporebat",				-- [33]
-				--["Pastinaca"]				= "Ray",					-- [34]
-				--["Serpente"]				= "Serpent",				-- [35]
-				--["Falena"]					= "Moth",					-- [37]
-				--["Chimera"]					= "Chimaera",				-- [38]
-				--["Gigantosauro"]			= "Devilsaur",				-- [39]
-				--["Ghoul"]					= "Ghoul",					-- [40]
-				--["Silitide"]				= "Silithid",				-- [41]
-				--["Verme"]					= "Worm",					-- [42]
-				--["Mammuceronte"]			= "Clefthoof",				-- [43]
-				--["Vespa"]					= "Wasp",					-- [44]
-				--["Segugio del Nucleo"]		= "Core Hound",				-- [45]
-				--["Bestia Eterea"]			= "Spirit Beast",			-- [46]
-				--["Elementale d'Acqua"]		= "Water Elemental",		-- [49]
-				--["Volpe"]					= "Fox",					-- [50]
-				--["Scimmia"]					= "Monkey",					-- [51]
-				--["Cane"]					= "Dog",					-- [52]
-				--["Scarabeo"]				= "Beetle",					-- [53]
-				--["Ragno Roccioso"]			= "Shale Spider",			-- [55]
-				--["Zombi"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["Idra"]					= "Hydra",					-- [68]
-				--["Vilimp"]					= "Fel Imp",				-- [100]
-				--["Signore del Vuoto"]		= "Voidlord",				-- [101]
-				--["Shivarra"]				= "Shivarra",				-- [102]
-				--["Osservatore"]				= "Observer",				-- [103]
-				--["Guardia dell'Ira"]		= "Wrathguard",				-- [104]
-				--["Infernale"]				= "Infernal",				-- [108]
-				--["Elementale del Fuoco"]	= "Fire Elemental",			-- [116]
-				--["Elementale di Terra"]		= "Earth Elemental",		-- [117]
-				--["Gru"]						= "Crane",					-- [125]
-				--["Gerride"]					= "Water Strider",			-- [126]
-				--["Roditore"]				= "Rodent",					-- [127]
-				--["Quilen"]					= "Quilen",					-- [128]
-				--["Caprone"]					= "Goat",					-- [129]
-				--["Basilisco"]				= "Basilisk",				-- [130]
-				--["Cornofurente"]			= "Direhorn",				-- [138]
-				--["Elementale Tempesta"]		= "Storm Elemental",		-- [145]
-				--["Guardia Maligna"]			= "Terrorguard",			-- [147]
-				--["Abission"]				= "Abyssal",				-- [148]
-				--["Bestia dei Fiumi"]		= "Riverbeast",				-- [150]
-				--["Cervo"]					= "Stag",					-- [151]
-				--["Unità Meccanica"]			= "Mechanical",				-- [154]
-				--["Abominio"]				= "Abomination",			-- [155]
-				--["Scagliamanto"]			= "Scalehide",				-- [156]
-				--["Yak"]						= "Oxen",					-- [157]
-				--["Piumanto"]				= "Feathermane",			-- [160]
-				--["Lucertola"]				= "Lizard",					-- [288]
-				--["Pterrordattilo"]			= "Pterrordax",				-- [290]
-				--["Rospo"]					= "Toad",					-- [291]
-				--["Krolusk"]					= "Krolusk",				-- [292]
-				--["Bestia di Sangue"]		= "Blood Beast",			-- [296]
+				["Vilguardia"]				= "Felguard",				-- [29]
+				["Dragofalco"]				= "Dragonhawk",				-- [30]
+				["Devastatore"]				= "Ravager",				-- [31]
+				["Segugio Distorcente"]		= "Warp Stalker",			-- [32]
+				["Sporofago"]				= "Sporebat",				-- [33]
+				["Pastinaca"]				= "Ray",					-- [34]
+				["Serpente"]				= "Serpent",				-- [35]
+				["Falena"]					= "Moth",					-- [37]
+				["Chimera"]					= "Chimaera",				-- [38]
+				["Gigantosauro"]			= "Devilsaur",				-- [39]
+				["Ghoul"]					= "Ghoul",					-- [40]
+				["Silitide"]				= "Silithid",				-- [41]
+				["Verme"]					= "Worm",					-- [42]
+				["Mammuceronte"]			= "Clefthoof",				-- [43]
+				["Vespa"]					= "Wasp",					-- [44]
+				["Segugio del Nucleo"]		= "Core Hound",				-- [45]
+				["Bestia Eterea"]			= "Spirit Beast",			-- [46]
+				["Elementale d'Acqua"]		= "Water Elemental",		-- [49]
+				["Volpe"]					= "Fox",					-- [50]
+				["Scimmia"]					= "Monkey",					-- [51]
+				["Cane"]					= "Dog",					-- [52]
+				["Scarabeo"]				= "Beetle",					-- [53]
+				["Ragno Roccioso"]			= "Shale Spider",			-- [55]
+				["Zombi"]					= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["Idra"]					= "Hydra",					-- [68]
+				["Vilimp"]					= "Fel Imp",				-- [100]
+				["Signore del Vuoto"]		= "Voidlord",				-- [101]
+				["Shivarra"]				= "Shivarra",				-- [102]
+				["Osservatore"]				= "Observer",				-- [103]
+				["Guardia dell'Ira"]		= "Wrathguard",				-- [104]
+				["Infernale"]				= "Infernal",				-- [108]
+				["Elementale del Fuoco"]	= "Fire Elemental",			-- [116]
+				["Elementale di Terra"]		= "Earth Elemental",		-- [117]
+				["Gru"]						= "Crane",					-- [125]
+				["Gerride"]					= "Water Strider",			-- [126]
+				["Roditore"]				= "Rodent",					-- [127]
+				["Quilen"]					= "Quilen",					-- [128]
+				["Caprone"]					= "Goat",					-- [129]
+				["Basilisco"]				= "Basilisk",				-- [130]
+				["Cornofurente"]			= "Direhorn",				-- [138]
+				["Elementale Tempesta"]		= "Storm Elemental",		-- [145]
+				["Guardia Maligna"]			= "Terrorguard",			-- [147]
+				["Abission"]				= "Abyssal",				-- [148]
+				["Bestia dei Fiumi"]		= "Riverbeast",				-- [150]
+				["Cervo"]					= "Stag",					-- [151]
+				["Unità Meccanica"]			= "Mechanical",				-- [154]
+				["Abominio"]				= "Abomination",			-- [155]
+				["Scagliamanto"]			= "Scalehide",				-- [156]
+				["Yak"]						= "Oxen",					-- [157]
+				["Piumanto"]				= "Feathermane",			-- [160]
+				["Lucertola"]				= "Lizard",					-- [288]
+				["Pterrordattilo"]			= "Pterrordax",				-- [290]
+				["Rospo"]					= "Toad",					-- [291]
+				["Krolusk"]					= "Krolusk",				-- [292]
+				["Bestia di Sangue"]		= "Blood Beast",			-- [296]
 			},
 			koKR				= {
 				["늑대"]						= "Wolf",					-- [1] 
-				["살쾡이"]						= "Cat",					-- [2] 
+				["살쾡이"]					= "Cat",					-- [2] 
 				["거미"]						= "Spider",					-- [3] 
 				["곰"]						= "Bear",					-- [4] 
-				["멧돼지"]						= "Boar",					-- [5] 
+				["멧돼지"]					= "Boar",					-- [5] 
 				["악어"]						= "Crocolisk",				-- [6] 
-				["독수리"]						= "Carrion Bird",			-- [7] 
+				["독수리"]					= "Carrion Bird",			-- [7] 
 				["게"]						= "Crab",					-- [8] 
-				["고릴라"]						= "Gorilla",				-- [9] 
+				["고릴라"]					= "Gorilla",				-- [9] 
 				["랩터"]						= "Raptor",					-- [11] 
 				["타조"]						= "Tallstrider",			-- [12] 
-				["지옥사냥개"]					= "Felhunter",				-- [15] 
-				["보이드워커"]					= "Voidwalker",				-- [16] Classic
-				["공허방랑자"]					= "Voidwalker",				-- [16] Retail
+				["지옥사냥개"]				= "Felhunter",				-- [15] 
+				["보이드워커"]				= "Voidwalker",				-- [16] Classic
+				["공허방랑자"]				= "Voidwalker",				-- [16] Retail
 				["서큐버스"]					= "Succubus",				-- [17] 
-				["파멸의수호병"]					= "Doomguard",				-- [19] Classic 
-				["파멸수호병"]					= "Doomguard",				-- [19] Retail 
+				["파멸의수호병"]				= "Doomguard",				-- [19] Classic 
+				["파멸수호병"]				= "Doomguard",				-- [19] Retail 
 				["전갈"]						= "Scorpid",				-- [20] 
 				["거북"]						= "Turtle",					-- [21] 
 				["임프"]						= "Imp",					-- [23] 
 				["박쥐"]						= "Bat",					-- [24] 
 				["하이에나"]					= "Hyena",					-- [25] 
-				["올빼미"]						= "Owl",					-- [26] Classic 
+				["올빼미"]					= "Owl",					-- [26] Classic 
 				["맹금"]						= "Bird of Prey",			-- [26] Retail
-				["천둥매"]						= "Wind Serpent",			-- [27] 
-				["무선조종 장난감"]				= "Remote Control",			-- [28]
-				--["지옥수호병"]					= "Felguard",				-- [29]
-				--["용매"]						= "Dragonhawk",				-- [30]
-				--["칼날발톱"]					= "Ravager",				-- [31]
-				--["차원의 추적자"]				= "Warp Stalker",			-- [32]
-				--["포자박쥐"]					= "Sporebat",				-- [33]
-				--["가오리"]						= "Ray",					-- [34]
-				--["뱀"]						= "Serpent",				-- [35]
-				--["나방"]						= "Moth",					-- [37]
-				--["키메라"]						= "Chimaera",				-- [38]
-				--["데빌사우루스"]					= "Devilsaur",				-- [39]
-				--["구울"]						= "Ghoul",					-- [40]
-				--["실리시드"]					= "Silithid",				-- [41]
-				--["벌레"]						= "Worm",					-- [42]
-				--["갈래발굽"]					= "Clefthoof",				-- [43]
-				--["말벌"]						= "Wasp",					-- [44]
-				--["심장부 사냥개"]				= "Core Hound",				-- [45]
-				--["야수 정령"]					= "Spirit Beast",			-- [46]
-				--["물의 정령"]					= "Water Elemental",		-- [49]
-				--["여우"]						= "Fox",					-- [50]
-				--["원숭이"]						= "Monkey",					-- [51]
-				--["개"]						= "Dog",					-- [52]
-				--["딱정벌레"]					= "Beetle",					-- [53]
-				--["혈암거미"]					= "Shale Spider",			-- [55]
-				--["좀비"]						= "Zombie",					-- [56]
-				--["<< QA 테스트용 >>"]			= "<< QA TEST FAMILY >>",	-- [57]
-				--["히드라"]						= "Hydra",					-- [68]
-				--["지옥 임프"]					= "Fel Imp",				-- [100]
-				--["공허군주"]					= "Voidlord",				-- [101]
-				--["쉬바라"]						= "Shivarra",				-- [102]
-				--["감시자"]						= "Observer",				-- [103]
-				--["격노수호병"]					= "Wrathguard",				-- [104]
-				--["지옥불정령"]					= "Infernal",				-- [108]
-				--["불의 정령"]					= "Fire Elemental",			-- [116]
-				--["대지의 정령"]					= "Earth Elemental",		-- [117]
-				--["학"]						= "Crane",					-- [125]
-				--["소금쟁이"]					= "Water Strider",			-- [126]
-				--["설치류"]						= "Rodent",					-- [127]
-				--["기렌"]						= "Quilen",					-- [128]
-				--["염소"]						= "Goat",					-- [129]
-				--["바실리스크"]					= "Basilisk",				-- [130]
-				--["공포뿔"]						= "Direhorn",				-- [138]
-				--["폭풍의 정령"]					= "Storm Elemental",		-- [145]
-				--["공포수호병"]					= "Terrorguard",			-- [147]
-				--["심연불정령"]					= "Abyssal",				-- [148]
-				--["강물하마"]					= "Riverbeast",				-- [150]
-				--["순록"]						= "Stag",					-- [151]
-				--["기계"]						= "Mechanical",				-- [154]
-				--["누더기골렘"]					= "Abomination",			-- [155]
-				--["비늘가죽"]					= "Scalehide",				-- [156]
-				--["소"]						= "Oxen",					-- [157]
-				--["뾰족갈기"]					= "Feathermane",			-- [160]
-				--["도마뱀"]						= "Lizard",					-- [288]
-				--["테러닥스"]					= "Pterrordax",				-- [290]
-				--["두꺼비"]						= "Toad",					-- [291]
-				--["크롤러스크"]					= "Krolusk",				-- [292]
-				--["피의 괴물"]					= "Blood Beast",			-- [296]
+				["천둥매"]					= "Wind Serpent",			-- [27] 
+				["무선조종 장난감"]			= "Remote Control",			-- [28]
+				["지옥수호병"]				= "Felguard",				-- [29]
+				["용매"]						= "Dragonhawk",				-- [30]
+				["칼날발톱"]					= "Ravager",				-- [31]
+				["차원의 추적자"]				= "Warp Stalker",			-- [32]
+				["포자박쥐"]					= "Sporebat",				-- [33]
+				["가오리"]					= "Ray",					-- [34]
+				["뱀"]						= "Serpent",				-- [35]
+				["나방"]						= "Moth",					-- [37]
+				["키메라"]					= "Chimaera",				-- [38]
+				["데빌사우루스"]				= "Devilsaur",				-- [39]
+				["구울"]						= "Ghoul",					-- [40]
+				["실리시드"]					= "Silithid",				-- [41]
+				["벌레"]						= "Worm",					-- [42]
+				["갈래발굽"]					= "Clefthoof",				-- [43]
+				["말벌"]						= "Wasp",					-- [44]
+				["심장부 사냥개"]				= "Core Hound",				-- [45]
+				["야수 정령"]				= "Spirit Beast",			-- [46]
+				["물의 정령"]				= "Water Elemental",		-- [49]
+				["여우"]						= "Fox",					-- [50]
+				["원숭이"]					= "Monkey",					-- [51]
+				["개"]						= "Dog",					-- [52]
+				["딱정벌레"]					= "Beetle",					-- [53]
+				["혈암거미"]					= "Shale Spider",			-- [55]
+				["좀비"]						= "Zombie",					-- [56]
+				["<< QA 테스트용 >>"]		= "<< QA TEST FAMILY >>",	-- [57]
+				["히드라"]					= "Hydra",					-- [68]
+				["지옥 임프"]				= "Fel Imp",				-- [100]
+				["공허군주"]					= "Voidlord",				-- [101]
+				["쉬바라"]					= "Shivarra",				-- [102]
+				["감시자"]					= "Observer",				-- [103]
+				["격노수호병"]				= "Wrathguard",				-- [104]
+				["지옥불정령"]				= "Infernal",				-- [108]
+				["불의 정령"]				= "Fire Elemental",			-- [116]
+				["대지의 정령"]				= "Earth Elemental",		-- [117]
+				["학"]						= "Crane",					-- [125]
+				["소금쟁이"]					= "Water Strider",			-- [126]
+				["설치류"]					= "Rodent",					-- [127]
+				["기렌"]						= "Quilen",					-- [128]
+				["염소"]						= "Goat",					-- [129]
+				["바실리스크"]				= "Basilisk",				-- [130]
+				["공포뿔"]					= "Direhorn",				-- [138]
+				["폭풍의 정령"]				= "Storm Elemental",		-- [145]
+				["공포수호병"]				= "Terrorguard",			-- [147]
+				["심연불정령"]				= "Abyssal",				-- [148]
+				["강물하마"]					= "Riverbeast",				-- [150]
+				["순록"]						= "Stag",					-- [151]
+				["기계"]						= "Mechanical",				-- [154]
+				["누더기골렘"]				= "Abomination",			-- [155]
+				["비늘가죽"]					= "Scalehide",				-- [156]
+				["소"]						= "Oxen",					-- [157]
+				["뾰족갈기"]					= "Feathermane",			-- [160]
+				["도마뱀"]					= "Lizard",					-- [288]
+				["테러닥스"]					= "Pterrordax",				-- [290]
+				["두꺼비"]					= "Toad",					-- [291]
+				["크롤러스크"]				= "Krolusk",				-- [292]
+				["피의 괴물"]				= "Blood Beast",			-- [296]
 			},
 			zhCN				= {
 				["狼"]						= "Wolf",					-- [1] 
 				["豹"]						= "Cat",					-- [2] 
-				["蜘蛛"]					= "Spider",					-- [3] 
+				["蜘蛛"]						= "Spider",					-- [3] 
 				["熊"]						= "Bear",					-- [4] 
-				["野猪"]					= "Boar",					-- [5] 
-				["鳄鱼"]					= "Crocolisk",				-- [6] 
+				["野猪"]						= "Boar",					-- [5] 
+				["鳄鱼"]						= "Crocolisk",				-- [6] 
 				["食腐鸟"]					= "Carrion Bird",			-- [7] 
-				["螃蟹"]					= "Crab",					-- [8] 
-				["猩猩"]					= "Gorilla",				-- [9] 
+				["螃蟹"]						= "Crab",					-- [8] 
+				["猩猩"]						= "Gorilla",				-- [9] 
 				["迅猛龙"]					= "Raptor",					-- [11] 
 				["陆行鸟"]					= "Tallstrider",			-- [12] 
 				["地狱猎犬"]					= "Felhunter",				-- [15] 
 				["虚空行者"]					= "Voidwalker",				-- [16] 
-				["魅魔"]					= "Succubus",				-- [17]  
+				["魅魔"]						= "Succubus",				-- [17]  
 				["末日守卫"]					= "Doomguard",				-- [19] 
-				["蝎子"]					= "Scorpid",				-- [20] 
-				["海龟"]					= "Turtle",					-- [21] 
-				["小鬼"]					= "Imp",					-- [23] 
-				["蝙蝠"]					= "Bat",					-- [24] 
-				["土狼"]					= "Hyena",					-- [25] 
+				["蝎子"]						= "Scorpid",				-- [20] 
+				["海龟"]						= "Turtle",					-- [21] 
+				["小鬼"]						= "Imp",					-- [23] 
+				["蝙蝠"]						= "Bat",					-- [24] 
+				["土狼"]						= "Hyena",					-- [25] 
 				["猫头鹰"]					= "Owl",					-- [26] Classic 
-				["猛禽"]					= "Bird of Prey",			-- [26] Retail
-				["风蛇"]					= "Wind Serpent",			-- [27] 
+				["猛禽"]						= "Bird of Prey",			-- [26] Retail
+				["风蛇"]						= "Wind Serpent",			-- [27] 
 				["远程控制"]					= "Remote Control",			-- [28] 
-				--["恶魔卫士"]					= "Felguard",				-- [29]
-				--["龙鹰"]					= "Dragonhawk",				-- [30]
-				--["掠食者"]					= "Ravager",				-- [31]
-				--["迁跃捕猎者"]				= "Warp Stalker",			-- [32]
-				--["孢子蝠"]					= "Sporebat",				-- [33]
-				--["鳐鱼"]					= "Ray",					-- [34]
-				--["蛇"]						= "Serpent",				-- [35]
-				--["蛾子"]					= "Moth",					-- [37]
-				--["奇美拉"]					= "Chimaera",				-- [38]
-				--["魔暴龙"]					= "Devilsaur",				-- [39]
-				--["食尸鬼"]					= "Ghoul",					-- [40]
-				--["异种虫"]					= "Silithid",				-- [41]
-				--["蠕虫"]					= "Worm",					-- [42]
-				--["裂蹄牛"]					= "Clefthoof",				-- [43]
-				--["巨蜂"]					= "Wasp",					-- [44]
-				--["熔岩犬"]					= "Core Hound",				-- [45]
-				--["灵魂兽"]					= "Spirit Beast",			-- [46]
-				--["水元素"]					= "Water Elemental",		-- [49]
-				--["狐狸"]					= "Fox",					-- [50]
-				--["猴子"]					= "Monkey",					-- [51]
-				--["狗"]						= "Dog",					-- [52]
-				--["甲虫"]					= "Beetle",					-- [53]
-				--["页岩蛛"]					= "Shale Spider",			-- [55]
-				--["僵尸"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["九头蛇"]					= "Hydra",					-- [68]
-				--["邪能小鬼"]					= "Fel Imp",				-- [100]
-				--["空灵领主"]					= "Voidlord",				-- [101]
-				--["破坏魔"]					= "Shivarra",				-- [102]
-				--["眼魔"]					= "Observer",				-- [103]
-				--["愤怒卫士"]					= "Wrathguard",				-- [104]
-				--["地狱火"]					= "Infernal",				-- [108]
-				--["火元素"]					= "Fire Elemental",			-- [116]
-				--["土元素"]					= "Earth Elemental",		-- [117]
-				--["鹤"]						= "Crane",					-- [125]
-				--["水黾"]					= "Water Strider",			-- [126]
-				--["啮齿动物"]					= "Rodent",					-- [127]
-				--["魁麟"]					= "Quilen",					-- [128]
-				--["山羊"]					= "Goat",					-- [129]
-				--["石化蜥蜴"]					= "Basilisk",				-- [130]
-				--["恐角龙"]					= "Direhorn",				-- [138]
-				--["风暴元素"]					= "Storm Elemental",		-- [145]
-				--["恐惧卫士"]					= "Terrorguard",			-- [147]
-				--["深渊魔"]					= "Abyssal",				-- [148]
-				--["淡水兽"]					= "Riverbeast",				-- [150]
-				--["雄鹿"]					= "Stag",					-- [151]
-				--["机械"]					= "Mechanical",				-- [154]
-				--["憎恶"]					= "Abomination",			-- [155]
-				--["鳞甲类"]					= "Scalehide",				-- [156]
-				--["牛"]						= "Oxen",					-- [157]
-				--["羽鬃兽"]					= "Feathermane",			-- [160]
-				--["蜥蜴"]					= "Lizard",					-- [288]
-				--["翼手龙"]					= "Pterrordax",				-- [290]
-				--["蟾蜍"]					= "Toad",					-- [291]
-				--["三叶虫"]					= "Krolusk",				-- [292]
-				--["血兽"]					= "Blood Beast",			-- [296]
+				["恶魔卫士"]					= "Felguard",				-- [29]
+				["龙鹰"]						= "Dragonhawk",				-- [30]
+				["掠食者"]					= "Ravager",				-- [31]
+				["迁跃捕猎者"]				= "Warp Stalker",			-- [32]
+				["孢子蝠"]					= "Sporebat",				-- [33]
+				["鳐鱼"]						= "Ray",					-- [34]
+				["蛇"]						= "Serpent",				-- [35]
+				["蛾子"]						= "Moth",					-- [37]
+				["奇美拉"]					= "Chimaera",				-- [38]
+				["魔暴龙"]					= "Devilsaur",				-- [39]
+				["食尸鬼"]					= "Ghoul",					-- [40]
+				["异种虫"]					= "Silithid",				-- [41]
+				["蠕虫"]						= "Worm",					-- [42]
+				["裂蹄牛"]					= "Clefthoof",				-- [43]
+				["巨蜂"]						= "Wasp",					-- [44]
+				["熔岩犬"]					= "Core Hound",				-- [45]
+				["灵魂兽"]					= "Spirit Beast",			-- [46]
+				["水元素"]					= "Water Elemental",		-- [49]
+				["狐狸"]						= "Fox",					-- [50]
+				["猴子"]						= "Monkey",					-- [51]
+				["狗"]						= "Dog",					-- [52]
+				["甲虫"]						= "Beetle",					-- [53]
+				["页岩蛛"]					= "Shale Spider",			-- [55]
+				["僵尸"]						= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["九头蛇"]					= "Hydra",					-- [68]
+				["邪能小鬼"]					= "Fel Imp",				-- [100]
+				["空灵领主"]					= "Voidlord",				-- [101]
+				["破坏魔"]					= "Shivarra",				-- [102]
+				["眼魔"]						= "Observer",				-- [103]
+				["愤怒卫士"]					= "Wrathguard",				-- [104]
+				["地狱火"]					= "Infernal",				-- [108]
+				["火元素"]					= "Fire Elemental",			-- [116]
+				["土元素"]					= "Earth Elemental",		-- [117]
+				["鹤"]						= "Crane",					-- [125]
+				["水黾"]						= "Water Strider",			-- [126]
+				["啮齿动物"]					= "Rodent",					-- [127]
+				["魁麟"]						= "Quilen",					-- [128]
+				["山羊"]						= "Goat",					-- [129]
+				["石化蜥蜴"]					= "Basilisk",				-- [130]
+				["恐角龙"]					= "Direhorn",				-- [138]
+				["风暴元素"]					= "Storm Elemental",		-- [145]
+				["恐惧卫士"]					= "Terrorguard",			-- [147]
+				["深渊魔"]					= "Abyssal",				-- [148]
+				["淡水兽"]					= "Riverbeast",				-- [150]
+				["雄鹿"]						= "Stag",					-- [151]
+				["机械"]						= "Mechanical",				-- [154]
+				["憎恶"]						= "Abomination",			-- [155]
+				["鳞甲类"]					= "Scalehide",				-- [156]
+				["牛"]						= "Oxen",					-- [157]
+				["羽鬃兽"]					= "Feathermane",			-- [160]
+				["蜥蜴"]						= "Lizard",					-- [288]
+				["翼手龙"]					= "Pterrordax",				-- [290]
+				["蟾蜍"]						= "Toad",					-- [291]
+				["三叶虫"]					= "Krolusk",				-- [292]
+				["血兽"]						= "Blood Beast",			-- [296]
 			},
 			zhTW				= {
 				["狼"]						= "Wolf",					-- [1] 
 				["豹"]						= "Cat",					-- [2] Classic
-				["大貓"]					= "Cat",					-- [2] Retail
-				["蜘蛛"]					= "Spider",					-- [3] 
+				["大貓"]						= "Cat",					-- [2] Retail
+				["蜘蛛"]						= "Spider",					-- [3] 
 				["熊"]						= "Bear",					-- [4] 
-				["野豬"]					= "Boar",					-- [5] 
-				["鱷魚"]					= "Crocolisk",				-- [6] 
+				["野豬"]						= "Boar",					-- [5] 
+				["鱷魚"]						= "Crocolisk",				-- [6] 
 				["食腐鳥"]					= "Carrion Bird",			-- [7] 
-				["螃蟹"]					= "Crab",					-- [8] 
-				["猩猩"]					= "Gorilla",				-- [9] 
+				["螃蟹"]						= "Crab",					-- [8] 
+				["猩猩"]						= "Gorilla",				-- [9] 
 				["迅猛龍"]					= "Raptor",					-- [11] 
 				["陸行鳥"]					= "Tallstrider",			-- [12] 
 				["地獄獵犬"]					= "Felhunter",				-- [15] Classic 
 				["惡魔獵犬"]					= "Felhunter",				-- [15] Retail 
 				["虛空行者"]					= "Voidwalker",				-- [16] Classic 
 				["虛無行者"]					= "Voidwalker",				-- [16] Retail 
-				["魅魔"]					= "Succubus",				-- [17] 
+				["魅魔"]						= "Succubus",				-- [17] 
 				["末日守衛"]					= "Doomguard",				-- [19] 
-				["蠍子"]					= "Scorpid",				-- [20] 
-				["海龜"]					= "Turtle",					-- [21]
-				["小鬼"]					= "Imp",					-- [23] 
-				["蝙蝠"]					= "Bat",					-- [24] 
-				["土狼"]					= "Hyena",					-- [25]
+				["蠍子"]						= "Scorpid",				-- [20] 
+				["海龜"]						= "Turtle",					-- [21]
+				["小鬼"]						= "Imp",					-- [23] 
+				["蝙蝠"]						= "Bat",					-- [24] 
+				["土狼"]						= "Hyena",					-- [25]
 				["貓頭鷹"]					= "Owl",					-- [26] Classic  
-				["猛禽"]					= "Bird of Prey",			-- [26] Retail
-				["風蛇"]					= "Wind Serpent",			-- [27] 
-				["遙控"]					= "Remote Control",			-- [28] 
-				--["惡魔守衛"]					= "Felguard",				-- [29]
-				--["龍鷹"]					= "Dragonhawk",				-- [30]
-				--["劫毀者"]					= "Ravager",				-- [31]
-				--["扭曲巡者"]					= "Warp Stalker",			-- [32]
-				--["孢子蝙蝠"]					= "Sporebat",				-- [33]
-				--["魟魚"]					= "Ray",					-- [34]
-				--["毒蛇"]					= "Serpent",				-- [35]
-				--["蛾"]						= "Moth",					-- [37]
-				--["奇美拉"]					= "Chimaera",				-- [38]
-				--["魔暴龍"]					= "Devilsaur",				-- [39]
-				--["食屍鬼"]					= "Ghoul",					-- [40]
-				--["異種蟲族"]					= "Silithid",				-- [41]
-				--["蟲"]						= "Worm",					-- [42]
-				--["裂蹄"]					= "Clefthoof",				-- [43]
-				--["黃蜂"]					= "Wasp",					-- [44]
-				--["熔核犬"]					= "Core Hound",				-- [45]
-				--["靈獸"]					= "Spirit Beast",			-- [46]
-				--["水元素"]					= "Water Elemental",		-- [49]
-				--["狐狸"]					= "Fox",					-- [50]
-				--["猴子"]					= "Monkey",					-- [51]
-				--["狗"]						= "Dog",					-- [52]
-				--["甲蟲"]					= "Beetle",					-- [53]
-				--["岩蛛"]					= "Shale Spider",			-- [55]
-				--["殭屍"]					= "Zombie",					-- [56]
-				--["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
-				--["多頭蛇"]					= "Hydra",					-- [68]
-				--["魔化小鬼"]					= "Fel Imp",				-- [100]
-				--["虛無領主"]					= "Voidlord",				-- [101]
-				--["希瓦拉"]					= "Shivarra",				-- [102]
-				--["觀察者"]					= "Observer",				-- [103]
-				--["憤怒守衛"]					= "Wrathguard",				-- [104]
-				--["煉獄火"]					= "Infernal",				-- [108]
-				--["火元素"]					= "Fire Elemental",			-- [116]
-				--["土元素"]					= "Earth Elemental",		-- [117]
-				--["鶴"]						= "Crane",					-- [125]
-				--["水黽"]					= "Water Strider",			-- [126]
-				--["齧齒類"]					= "Rodent",					-- [127]
-				--["麒麟獸"]					= "Quilen",					-- [128]
-				--["山羊"]					= "Goat",					-- [129]
-				--["蜥蜴"]					= "Basilisk",				-- [130]
-				--["恐角龍"]					= "Direhorn",				-- [138]
-				--["風暴元素"]					= "Storm Elemental",		-- [145]
-				--["恐懼護衛"]					= "Terrorguard",			-- [147]
-				--["冥淵火"]					= "Abyssal",				-- [148]
-				--["河獸"]					= "Riverbeast",				-- [150]
-				--["雄鹿"]					= "Stag",					-- [151]
-				--["機械"]					= "Mechanical",				-- [154]
-				--["憎惡體"]					= "Abomination",			-- [155]
-				--["鱗皮"]					= "Scalehide",				-- [156]
-				--["玄牛"]					= "Oxen",					-- [157]
-				--["羽鬃"]					= "Feathermane",			-- [160]
-				--["蜥蜴"]					= "Lizard",					-- [288]
-				--["翼手龍"]					= "Pterrordax",				-- [290]
-				--["青蛙"]					= "Toad",					-- [291]
-				--["葉殼蟲"]					= "Krolusk",				-- [292]
-				--["血獸"]					= "Blood Beast",			-- [296]
+				["猛禽"]						= "Bird of Prey",			-- [26] Retail
+				["風蛇"]						= "Wind Serpent",			-- [27] 
+				["遙控"]						= "Remote Control",			-- [28] 
+				["惡魔守衛"]					= "Felguard",				-- [29]
+				["龍鷹"]						= "Dragonhawk",				-- [30]
+				["劫毀者"]					= "Ravager",				-- [31]
+				["扭曲巡者"]					= "Warp Stalker",			-- [32]
+				["孢子蝙蝠"]					= "Sporebat",				-- [33]
+				["魟魚"]						= "Ray",					-- [34]
+				["毒蛇"]						= "Serpent",				-- [35]
+				["蛾"]						= "Moth",					-- [37]
+				["奇美拉"]					= "Chimaera",				-- [38]
+				["魔暴龍"]					= "Devilsaur",				-- [39]
+				["食屍鬼"]					= "Ghoul",					-- [40]
+				["異種蟲族"]					= "Silithid",				-- [41]
+				["蟲"]						= "Worm",					-- [42]
+				["裂蹄"]						= "Clefthoof",				-- [43]
+				["黃蜂"]						= "Wasp",					-- [44]
+				["熔核犬"]					= "Core Hound",				-- [45]
+				["靈獸"]						= "Spirit Beast",			-- [46]
+				["水元素"]					= "Water Elemental",		-- [49]
+				["狐狸"]						= "Fox",					-- [50]
+				["猴子"]						= "Monkey",					-- [51]
+				["狗"]						= "Dog",					-- [52]
+				["甲蟲"]						= "Beetle",					-- [53]
+				["岩蛛"]						= "Shale Spider",			-- [55]
+				["殭屍"]						= "Zombie",					-- [56]
+				["<< QA TEST FAMILY >>"]	= "<< QA TEST FAMILY >>",	-- [57]
+				["多頭蛇"]					= "Hydra",					-- [68]
+				["魔化小鬼"]					= "Fel Imp",				-- [100]
+				["虛無領主"]					= "Voidlord",				-- [101]
+				["希瓦拉"]					= "Shivarra",				-- [102]
+				["觀察者"]					= "Observer",				-- [103]
+				["憤怒守衛"]					= "Wrathguard",				-- [104]
+				["煉獄火"]					= "Infernal",				-- [108]
+				["火元素"]					= "Fire Elemental",			-- [116]
+				["土元素"]					= "Earth Elemental",		-- [117]
+				["鶴"]						= "Crane",					-- [125]
+				["水黽"]						= "Water Strider",			-- [126]
+				["齧齒類"]					= "Rodent",					-- [127]
+				["麒麟獸"]					= "Quilen",					-- [128]
+				["山羊"]						= "Goat",					-- [129]
+				["蜥蜴"]						= "Basilisk",				-- [130]
+				["恐角龍"]					= "Direhorn",				-- [138]
+				["風暴元素"]					= "Storm Elemental",		-- [145]
+				["恐懼護衛"]					= "Terrorguard",			-- [147]
+				["冥淵火"]					= "Abyssal",				-- [148]
+				["河獸"]						= "Riverbeast",				-- [150]
+				["雄鹿"]						= "Stag",					-- [151]
+				["機械"]						= "Mechanical",				-- [154]
+				["憎惡體"]					= "Abomination",			-- [155]
+				["鱗皮"]						= "Scalehide",				-- [156]
+				["玄牛"]						= "Oxen",					-- [157]
+				["羽鬃"]						= "Feathermane",			-- [160]
+				["蜥蜴"]						= "Lizard",					-- [288]
+				["翼手龍"]					= "Pterrordax",				-- [290]
+				["青蛙"]						= "Toad",					-- [291]
+				["葉殼蟲"]					= "Krolusk",				-- [292]
+				["血獸"]						= "Blood Beast",			-- [296]
 			},
 		}, 
 		{
@@ -1867,6 +4380,9 @@ local InfoCacheStaying						= Info.CacheStaying
 local InfoCacheInterrupt					= Info.CacheInterrupt
 
 local InfoSpecIs 							= Info.SpecIs
+local InfoClassSpecBuffs					= Info.ClassSpecBuffs
+local InfoClassSpecSpells					= Info.ClassSpecSpells
+local InfoClassIsMelee 						= Info.ClassIsMelee
 local InfoClassCanBeHealer 					= Info.ClassCanBeHealer
 local InfoClassCanBeTank 					= Info.ClassCanBeTank
 local InfoClassCanBeMelee 					= Info.ClassCanBeMelee
@@ -1908,32 +4424,52 @@ A.Unit = PseudoClass({
 		
 		return select(2, UnitClass(unitID)) or str_none
 	end, "UnitID"),
-	Role 									= Cache:Pass(function(self, hasRole)  
-		-- @return boolean or string (depended on hasRole argument, TANK, HEALER, DAMAGER, NONE) 
-		-- Nill-able: hasRole
+	Role 									= Cache:Pass(function(self, hasRole) 
+		-- @param hasRole 	- nil or string one of follows: "TANK", "HEALER", "DAMAGER", "NONE"
+		-- @return boolean	- if 'hasRole' passed as string
+		-- @return string	- otherwise returns role of unitID: "TANK", "HEALER", "DAMAGER", "NONE"
 		local unitID 						= self.UnitID
+		local role							= UnitGroupRolesAssigned(unitID)
+		
+		if not role or role == "NONE" then
+			if A.ZoneID == 480 then
+				-- Proving Grounds
+				local npcID = self(unitID):InfoGUID()
+				if npcID == 72218 then
+					-- Oto the Protector
+					role = "TANK"
+				elseif npcID == 71828 then
+					-- Sikari the Mistweaver
+					role = "HEALER"
+				else
+					role = "DAMAGER"
+				end
+			elseif hasRole then 
+				if hasRole == "HEALER" then 
+					return self(unitID):IsHealer()
+				elseif hasRole == "TANK" then 
+					return self(unitID):IsTank()
+				elseif hasRole == "DAMAGER" then 
+					return self(unitID):IsDamager()
+				elseif hasRole == "NONE" then 
+					return true
+				else 
+					return false
+				end 
+			else 
+				if self(unitID):IsHealer() then 
+					return "HEALER"
+				elseif self(unitID):IsTank() then 
+					return "TANK"
+				elseif self(unitID):IsDamager() then 
+					return "DAMAGER"
+				else 
+					return "NONE"
+				end 
+			end
+		end
 
-		if hasRole then 
-			if hasRole == "HEALER" then 
-				return self(unitID):IsHealer()
-			elseif hasRole == "TANK" then 
-				return self(unitID):IsTank()
-			elseif hasRole == "DAMAGER" then 
-				return self(unitID):IsDamager()
-			else 
-				return false
-			end 
-		else 
-			if self(unitID):IsHealer() then 
-				return "HEALER"
-			elseif self(unitID):IsTank() then 
-				return "TANK"
-			elseif self(unitID):IsDamager() then 
-				return "DAMAGER"
-			else 
-				return "NONE"
-			end 
-		end 				
+		return (hasRole and hasRole == role) or (not hasRole and role)
 	end, "UnitID"),
 	Classification							= Cache:Pass(function(self)  
 		-- @return string or empty string  
@@ -2043,6 +4579,11 @@ A.Unit = PseudoClass({
 		local unitID 						= self.UnitID
 		return UnitIsUnit(unitID, "player") or UnitInRange(unitID)
 	end, "UnitID"),
+	InVehicle								= Cache:Pass(function(self)
+		-- @return boolean
+		local unitID 						= self.UnitID
+		return UnitInVehicle(unitID)
+	end, "UnitID"),
 	InCC 									= Cache:Wrap(function(self, index)
 		-- @return number (time in seconds of remain crownd control)
 		-- Nill-able: index
@@ -2061,120 +4602,365 @@ A.Unit = PseudoClass({
 		-- Nill-able: isPlayer
 		local unitID 						= self.UnitID
 		return unitID and (UnitCanAttack("player", unitID) or UnitIsEnemy("player", unitID)) and (not isPlayer or UnitIsPlayer(unitID))
-	end, "UnitID"),	
-	IsHealer 								= Cache:Wrap(function(self, skipUnitIsUnit, class)  
+	end, "UnitGUID"),	
+	IsHealer 								= Cache:Pass(function(self, class)  
 		-- @return boolean
-		-- Nill-able: skipUnitIsUnit, class
+		-- Nill-able: class
 		local unitID 						= self.UnitID
-		if not skipUnitIsUnit and UnitIsUnit(unitID, "player") then 
-			return self("player"):HasSpec(InfoSpecIs.HEALER) 
-		end 
-		
-		if InfoClassCanBeHealer[class or self(unitID):Class()] then 		
+		local unitID_class 					= class or self(unitID):Class()		
+		if InfoClassCanBeHealer[unitID_class] then
+			local isEnemy 					= self(unitID):IsEnemy()
+			if isEnemy then
+				if TeamCacheEnemyHEALER[unitID] or self(unitID):HasSpec(InfoSpecIs.HEALER) then
+					return true
+				elseif BuildToC >= 50500 and (A.Zone == "pvp" or A.Zone == "arena") then
+					return false
+				end
+			else
+				if TeamCacheFriendlyHEALER[unitID] then
+					return true
+				end
+				
+				local role = UnitGroupRolesAssigned(unitID)
+				if role == "HEALER" or (UnitIsUnit(unitID, "player") and self(unitID):HasSpec(InfoSpecIs.HEALER)) then
+					return true
+				elseif role and role ~= "NONE" then
+					return false
+				elseif GetPartyAssignment("maintank", unitID) or GetPartyAssignment("mainassist", unitID) then
+					return false
+				end
+			end
+			
+			-- Fallback
+			if unitID_class == "PALADIN" then 				
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power ~= "MANA" or offhand ~= nil then
+					return false
+				else
+					local tankBuff = self(unitID):HasBuffs(InfoClassCanBeTank[unitID_class])
+					if tankBuff > 0 then 
+						-- Protection
+						if not A_GetUnitItem or isEnemy or A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD, nil, true) then -- byPassDistance, so if buff is up he's more likely tank
+							return false
+						end
+					else
+						-- Retribution
+						if not isEnemy and A_GetUnitItem and not A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD) then
+							return false
+						end
+					end
+				end				
+			elseif unitID_class == "DRUID" then 
+				local _, power = UnitPowerType(unitID)
+				if power ~= "MANA" or self(unitID):HasBuffs(InfoClassCanBeTank[unitID_class]) > 0 then
+					return false
+				end
+			elseif unitID_class == "MONK" then
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power == "MANA" then
+					return true
+				elseif offhand ~= nil then
+					return false
+				elseif UnitStagger and UnitStagger(unitID) ~= 0 then
+					return false
+				end					
+			elseif unitID_class == "PRIEST" then
+				local _, power = UnitPowerType(unitID)
+				if power ~= "MANA" then
+					return false
+				end
+			elseif unitID_class == "SHAMAN" then
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power ~= "MANA" or offhand ~= nil then
+					return false
+				end			
+			end
+			
+			if not A.IsInPvP then 
+				local unitIDtarget = strjoin("", unitID, "target")
+				if UnitIsUnit(unitID, strjoin("", unitIDtarget, "target")) and self(unitIDtarget):IsBoss() then 
+					return false 
+				end
+			end				
+			
 											-- bypass it in PvP 
 			local taken_dmg 				= (self(unitID):IsEnemy() and self(unitID):IsPlayer() and 0) or CombatTracker:GetDMG(unitID)
 			local done_dmg					= CombatTracker:GetDPS(unitID)
 			local done_hps					= CombatTracker:GetHPS(unitID)
 			return done_hps > taken_dmg and done_hps > done_dmg  
 		end 
-	end, "UnitGUID"),
+	end, "UnitID"),
 	IsHealerClass							= Cache:Pass(function(self)  
 		-- @return boolean
 		local unitID 						= self.UnitID
 		return InfoClassCanBeHealer[self(unitID):Class()]
 	end, "UnitID"),	
-	IsTank 									= Cache:Wrap(function(self, skipUnitIsUnit, class)    
+	IsTank 									= Cache:Pass(function(self, class)    
 		-- @return boolean 
-		-- Nill-able: skipUnitIsUnit, class
+		-- Nill-able: class
 		local unitID 						= self.UnitID
-		if not skipUnitIsUnit and UnitIsUnit(unitID, "player") then 
-			return self("player"):HasSpec(InfoSpecIs.TANK) 
-		end 
-		
 		local unitID_class 					= class or self(unitID):Class()
-		if InfoClassCanBeTank[unitID_class] then 
-			if unitID:match("raid%d+") and GetPartyAssignment("maintank", unitID) then 
-				return true 
-			end 
-			
-			if CombatTracker:CombatTime(unitID) == 0 then 
-				if unitID_class == "PALADIN" then 
-					local _, offhand = UnitAttackSpeed(unitID)
-					-- Buff: Righteous Fury 
-					return offhand == nil and self(unitID):HasBuffs(25781) > 0 and A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD, nil, true) -- byPassDistance
-				elseif unitID_class == "DRUID" then 
-					return UnitPowerType(unitID) == 1
-				elseif unitID_class == "WARRIOR" then 
-					local _, offhand = UnitAttackSpeed(unitID)
-					-- Buff: Defensive Stance
-					return offhand == nil and self(unitID):HasBuffs(71) > 0 and A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD) -- don't byPassDistance
+		local tankBuffsOrCanBeTank			= InfoClassCanBeTank[unitID_class]
+		if tankBuffsOrCanBeTank then 
+			local isEnemy 					= self(unitID):IsEnemy()
+			if isEnemy then
+				if TeamCacheEnemyTANK[unitID] or self(unitID):HasSpec(InfoSpecIs.TANK) then
+					return true
+				elseif BuildToC >= 50500 and (A.Zone == "pvp" or A.Zone == "arena") then
+					return false
 				end
-			elseif not A.IsInPvP then 
-				local unitIDtarget = unitID .. "target"
-				if UnitIsUnit(unitID, unitIDtarget .. "target") and self(unitIDtarget):IsBoss() then 
+			else
+				if TeamCacheFriendlyTANK[unitID] then
+					return true
+				end
+				
+				local role = UnitGroupRolesAssigned(unitID)
+				if role == "TANK" or GetPartyAssignment("maintank", unitID) or (UnitIsUnit(unitID, "player") and self(unitID):HasSpec(InfoSpecIs.TANK)) then
+					return true
+				elseif role and role ~= "NONE" then
+					return false
+				end	
+			end		
+			
+			-- Fallback
+			if unitID_class == "PALADIN" then 
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power ~= "MANA" or offhand ~= nil then
+					return false
+				else
+					local tankBuff = self(unitID):HasBuffs(tankBuffsOrCanBeTank)
+					if tankBuff > 0 then 
+						-- Protection
+						if not A_GetUnitItem or isEnemy or A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD, nil, true) then -- byPassDistance, so if buff is up he's more likely tank
+							return true
+						end
+					else
+						-- Retribution
+						if A.IsInPvP or self(unitID):ThreatSituation(strjoin("", unitID, "target")) < 3 then
+							return false
+						end
+					end
+				end
+			elseif unitID_class == "DRUID" then 
+				local _, power = UnitPowerType(unitID)
+				return power == "RAGE" or self(unitID):HasBuffs(tankBuffsOrCanBeTank) > 0
+			elseif unitID_class == "WARRIOR" then				
+				local _, offhand = UnitAttackSpeed(unitID)
+				-- 1h+shield ensures he's friendly tank
+				if offhand == nil and not isEnemy and A_GetUnitItem and A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD) then -- don't byPassDistance
+					return true
+				end
+				
+				if self(unitID):HasBuffs(tankBuffsOrCanBeTank) == 0 and (A.IsInPvP or self(unitID):ThreatSituation(strjoin("", unitID, "target")) < 3) then
+					return false
+					-- ↓↓↓ if warrior in Defensive Stance or has threat he can be tank even without shield equipped aka fury tank, then we will use generic approach below to recognize it ↓↓↓
+				end
+			elseif unitID_class == "MONK" then
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power == "MANA" or offhand ~= nil then
+					return false
+				elseif UnitStagger and UnitStagger(unitID) ~= 0 then
+					return true
+				end				
+			elseif unitID_class == "DEATHKNIGHT" then
+				local _, offhand = UnitAttackSpeed(unitID)
+				return offhand == nil and self(unitID):HasBuffs(tankBuffsOrCanBeTank) > 0
+			end
+			
+			if not A.IsInPvP then 
+				local unitIDtarget = strjoin("", unitID, "target")
+				if UnitIsUnit(unitID, strjoin("", unitIDtarget, "target")) and self(unitIDtarget):IsBoss() then 
 					return true 
-				end 
-			end 
+				end
+			end					
 			
 			local taken_dmg 				= CombatTracker:GetDMG(unitID)
 			local done_dmg					= CombatTracker:GetDPS(unitID)
 			local done_hps					= CombatTracker:GetHPS(unitID)
 			return taken_dmg > done_dmg and taken_dmg > done_hps
 		end 
-	end, "UnitGUID"),	
+	end, "UnitID"),	
 	IsTankClass								= Cache:Pass(function(self)  
 		-- @return boolean
 		local unitID 						= self.UnitID
-		return InfoClassCanBeTank[self(unitID):Class()]
+		return InfoClassCanBeTank[self(unitID):Class()] and true -- don't touch true otherwise it may return table or number because of tank buffs
 	end, "UnitID"),	
-	IsDamager								= Cache:Wrap(function(self, skipUnitIsUnit)    
+	IsDamager								= Cache:Pass(function(self, class)    
 		-- @return boolean 
-		-- Nill-able: skipUnitIsUnit
 		local unitID 						= self.UnitID
-		if not skipUnitIsUnit and UnitIsUnit(unitID, "player") then 
-			return self("player"):HasSpec(InfoSpecIs.DAMAGER) 
-		end 
-
-		if unitID:match("raid%d+") and GetPartyAssignment("mainassist", unitID) then 
-			return true 
-		end 
+		local unitID_class 					= class or self(unitID):Class()
+		local isEnemy 						= self(unitID):IsEnemy()
+	    if isEnemy then
+			if TeamCacheEnemyDAMAGER[unitID] or self(unitID):HasSpec(InfoSpecIs.DAMAGER) then
+				return true
+			elseif BuildToC >= 50500 and (A.Zone == "pvp" or A.Zone == "arena") then
+				return false
+			end
+		else
+			if TeamCacheFriendlyDAMAGER[unitID] then
+				return true
+			end
+			
+			local role = UnitGroupRolesAssigned(unitID)
+			if role == "DAMAGER" or (UnitIsUnit(unitID, "player") and self(unitID):HasSpec(InfoSpecIs.DAMAGER)) then
+				return true
+			elseif role and role ~= "NONE" then
+				return false
+			elseif GetPartyAssignment("maintank", unitID) then
+				return false
+			end
+		end
+		
+		-- Fallback
+		if unitID_class == "PALADIN" then 
+			local _, power = UnitPowerType(unitID)
+			local _, offhand = UnitAttackSpeed(unitID)
+			if power ~= "MANA" or offhand ~= nil then
+				return true
+			else
+				local tankBuff = self(unitID):HasBuffs(InfoClassCanBeTank[unitID_class])
+				if tankBuff > 0 then 
+					-- Protection
+					if not A_GetUnitItem or isEnemy or A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD, nil, true) then -- byPassDistance, so if buff is up he's more likely tank
+						return false
+					end
+				else
+					-- Retribution
+					if not isEnemy and A_GetUnitItem and not A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD) then
+						return true
+					end
+				end
+			end			
+		elseif unitID_class == "DRUID" then 			
+			if self(unitID):HasBuffs(InfoClassCanBeTank[unitID_class]) > 0 then
+				return false
+			end
+			
+			local _, power = UnitPowerType(unitID)
+			return power == "ENERGY" or power == "LUNARPOWER" 
+		elseif unitID_class == "MONK" then
+			local _, power = UnitPowerType(unitID)
+			local _, offhand = UnitAttackSpeed(unitID)
+			if power == "MANA" then
+				return false
+			elseif offhand ~= nil or (UnitStagger and UnitStagger(unitID) == 0) then
+				return true
+			end
+		elseif unitID_class == "PRIEST" then
+			local _, power = UnitPowerType(unitID)
+			if power ~= "MANA" then
+				return true
+			end
+		elseif unitID_class == "SHAMAN" then
+			local _, power = UnitPowerType(unitID)
+			local _, offhand = UnitAttackSpeed(unitID)
+			if power ~= "MANA" or offhand ~= nil then
+				return true
+			end	
+		end
+		
+		if not A.IsInPvP then 
+			local unitIDtarget = strjoin("", unitID, "target")
+			if UnitIsUnit(unitID, strjoin("", unitIDtarget, "target")) and self(unitIDtarget):IsBoss() then 
+				return false 
+			end
+		end		
+		
 											-- bypass it in PvP 
-		local taken_dmg 					= (self(unitID):IsEnemy() and self(unitID):IsPlayer() and 0) or CombatTracker:GetDMG(unitID) 
+		local taken_dmg 					= (isEnemy and self(unitID):IsPlayer() and 0) or CombatTracker:GetDMG(unitID) 
 		local done_dmg						= CombatTracker:GetDPS(unitID)
 		local done_hps						= CombatTracker:GetHPS(unitID)
 		return done_dmg > taken_dmg and done_dmg > done_hps 
-	end, "UnitGUID"),	
-	IsMelee 								= Cache:Wrap(function(self) 
+	end, "UnitID"),	
+	IsMelee 								= Cache:Pass(function(self, class) 
 		-- @return boolean 
 		local unitID 						= self.UnitID
-		if UnitIsUnit(unitID, "player") then 
-			return self("player"):HasSpec(InfoSpecIs.MELEE) 
-		end 
-		
-		local class = self(unitID):Class()
-		if InfoClassCanBeMelee[class] then 
-			if self(unitID):IsTank(true, class) then 
-				return true 
+		local unitID_class 					= class or self(unitID):Class()		
+		if InfoClassCanBeMelee[unitID_class] then
+			local isEnemy 					= self(unitID):IsEnemy()
+			if isEnemy then
+				if TeamCacheEnemyDAMAGER_MELEE[unitID] or self(unitID):HasSpec(InfoSpecIs.MELEE) then
+					return true
+				elseif BuildToC >= 50500 and (A.Zone == "pvp" or A.Zone == "arena") then
+					return false
+				end
+			else
+				if TeamCacheFriendlyDAMAGER_MELEE[unitID] then
+					return true
+				end
+
+				local role = UnitGroupRolesAssigned(unitID)
+				if role == "TANK" or (role == "DAMAGER" and (unitID_class == "PALADIN" or unitID_class == "MONK")) or GetPartyAssignment("maintank", unitID) or (UnitIsUnit(unitID, "player") and self(unitID):HasSpec(InfoSpecIs.MELEE)) then
+					return true
+				elseif role == "HEALER" then
+					return false
+				end
 			end 
 			
-			if self(unitID):IsDamager(true) then 
-				if unitClass == "SHAMAN" then 
-					local _, offhand = UnitAttackSpeed(unitID)
-					return offhand ~= nil                    
-				elseif unitClass == "DRUID" then 
-					local _, power = UnitPowerType(unitID)
-					return power == "ENERGY" or power == "FURY"
-				else 
-					return true 
-				end 
-			else 
-				if class == "DRUID" then 
-					local _, power = UnitPowerType(unitID)
-					return power == "ENERGY" or power == "FURY"					
-				end 
-			end 
+			-- Fallback
+			if unitID_class == "PALADIN" then	
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power ~= "MANA" or offhand ~= nil then
+					return true
+				else
+					local tankBuff = self(unitID):HasBuffs(InfoClassCanBeTank[unitID_class])
+					if tankBuff > 0 then 
+						-- Protection
+						if not A_GetUnitItem or isEnemy or A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD, nil, true) then -- byPassDistance, so if buff is up he's more likely tank
+							return true
+						end
+					else
+						-- Retribution
+						if not isEnemy and A_GetUnitItem and not A_GetUnitItem(unitID, CONST.INVSLOT_OFFHAND, LE_ITEM_CLASS_ARMOR, LE_ITEM_ARMOR_SHIELD) then
+							return true
+						end
+						
+															-- bypass it in PvP 
+						local taken_dmg 					= (isEnemy and self(unitID):IsPlayer() and 0) or CombatTracker:GetDMG(unitID) 
+						local done_dmg						= CombatTracker:GetDPS(unitID)
+						local done_hps						= CombatTracker:GetHPS(unitID)
+						return done_dmg > taken_dmg and done_dmg > done_hps 
+					end
+				end
+			elseif unitID_class == "HUNTER" then
+				return
+				(
+					self(unitID):GetSpellCounter(186270) > 0 or -- Raptor Strike
+					self(unitID):GetSpellCounter(259387) > 0 or -- Mongoose Bite
+					self(unitID):GetSpellCounter(190925) > 0 or -- Harpoon
+					self(unitID):GetSpellCounter(259495) > 0    -- Firebomb
+				)
+			elseif unitID_class == "SHAMAN" then
+				local _, offhand = UnitAttackSpeed(unitID)
+				return offhand ~= nil
+			elseif unitID_class == "MONK" then
+				local _, power = UnitPowerType(unitID)
+				local _, offhand = UnitAttackSpeed(unitID)
+				if power == "MANA" then
+					return false
+				elseif offhand ~= nil or (UnitStagger and UnitStagger(unitID) > 0) then
+					return true
+				else
+														-- bypass it in PvP 
+					local taken_dmg 					= (isEnemy and self(unitID):IsPlayer() and 0) or CombatTracker:GetDMG(unitID) 
+					local done_dmg						= CombatTracker:GetDPS(unitID)
+					local done_hps						= CombatTracker:GetHPS(unitID)
+					return done_dmg > taken_dmg and done_dmg > done_hps 
+				end
+			elseif unitID_class == "DRUID" then
+				local _, power = UnitPowerType(unitID)
+				return power == "ENERGY" or power == "RAGE"
+			else 				
+				return true -- Warrior, Rogue, DH, DK
+			end
 		end 
-	end, "UnitGUID"),
+	end, "UnitID"),
 	IsMeleeClass							= Cache:Pass(function(self)  
 		-- @return boolean
 		local unitID 						= self.UnitID
@@ -2481,10 +5267,14 @@ A.Unit = PseudoClass({
 		local castName, castStartTime, castEndTime, notInterruptable, spellID, isChannel = self(unitID):IsCasting()
 
 		local TotalCastTime, CurrentCastTimeSeconds, CurrentCastTimeLeftPercent = 0, 0, 0
-		if unitID == "player" then 
-			TotalCastTime = (select(4, GetSpellInfo(argSpellID or spellID)) or 0) / 1000
+		if unitID == "player" and (argSpellID or spellID) then
+			local s, _, _, castTime = GetSpellInfo(argSpellID or spellID) -- Must be real-time data
+			if type(s) == "table" then
+				castTime = s.castTime
+			end
+			TotalCastTime = (castTime or 0) / 1000
 			CurrentCastTimeSeconds = TotalCastTime
-		end 
+		end
 		
 		if castName and (not argSpellID or A_GetSpellInfo(argSpellID) == castName) then 
 			TotalCastTime = (castEndTime - castStartTime) / 1000
@@ -2517,29 +5307,54 @@ A.Unit = PseudoClass({
 		
 		return 0, 0, 0
 	end, "UnitGUID"),
-	IsControlAble 							= Cache:Pass(function(self, drCat, drDiminishing)
+	IsControlAble 							= Cache:Pass(function(self, drCat, DR_Tick)
 		-- @return boolean 
-		-- drDiminishing is Tick (number: 100 -> 50 -> 25 -> 0) where 0 is fully imun, 100% no imun - can be fully duration CC'ed 
+		-- DR_Tick is Tick (number: 100 -> 50 -> 25 -> 0) where 0 is fully imun, 100 is no imun
 		-- "taunt" has unique Tick (number: 100 -> 65 -> 42 -> 27 -> 0)
+		-- DR_Remain is remain in seconds time before DR_Application will be reset
+		-- DR_Application is how much DR stacks were applied currently and DR_ApplicationMax is how much by that category can be applied in total 
 		--[[ drCat accepts:
-			"incapacitate"
-			"silence"
-			"stun"							-- PvE unlocked  
-			"root"
-			"disarm"						-- Added in original DRList	
-			"random_stun"
-			"random_root"					-- May be removed in the future!
-			"fear"
-			"mind_control"
-			"frost_shock"
-			"kidney_shot"	
+			"disorient"						-- TBC Retail
+			"incapacitate"					-- Any
+			"silence"						-- WOTLK+ Retail
+			"stun"							-- Any
+			"random_stun"					-- non-Retail 
+			"taunt"							-- Retail 
+			"root"							-- Any 
+			"random_root"					-- non-Retail
+			"disarm"						-- Classic+ Retail
+			"knockback"						-- Retail
+			"counterattack"					-- TBC+ non-Retail
+			"chastise"						-- TBC 
+			"kidney_shot"					-- Classic TBC 
+			"unstable_affliction"			-- TBC 
+			"death_coil"					-- TBC 
+			"fear"							-- Classic+ non-Retail
+			"mind_control"					-- Classic+ non-Retail 
+			"horror"						-- WOTLK+ non-Retail
+			"opener_stun"					-- WOTLK 
+			"scatter"						-- TBC+ non-Retail
+			"cyclone"						-- WOTLK+ non-Retail
+			"charge"						-- WOTLK 
+			"deep_freeze_rof"				-- CATA+ non-Retail
+			"bind_elemental"				-- CATA+ non-Retail
+			"frost_shock"					-- Classic 
+			
+			non-Player unitID considered as PvE spells and accepts only: 
+			"stun", "kidney_shot"						-- Classic 
+			"stun", "random_stun", "kidney_shot"		-- TBC 
+			"stun", "random_stun", "opener_stun"		-- WOTLK 
+			"stun", "random_stun", "cyclone"			-- CATA 
+			"taunt", "stun"								-- Retail 
+			
+			Same note should be kept in Unit(unitID):IsControlAble, Unit(unitID):GetDR(), CombatTracker.GetDR(unitID)
 		]]
-		-- Nill-able: drDiminishing
+		-- Nill-able: DR_Tick, if its nil function returns true whenever non-imun drCat is apply able
 		local unitID 						= self.UnitID 
 		if not A.IsInPvP then 
-			return not self(unitID):IsBoss() and InfoControlAbleClassification[self(unitID):Classification()] and (not drCat or self(unitID):GetDR(drCat) > (drDiminishing or 0)) and (drCat ~= "fear" or self(unitID):HasDeBuffs(AuraList.FearImunDeBuffs) == 0)
+			return not self(unitID):IsBoss() and InfoControlAbleClassification[self(unitID):Classification()] and (not drCat or self(unitID):GetDR(drCat) > (DR_Tick or 0)) and (drCat ~= "fear" or (AuraList.FearImunDeBuffs and self(unitID):HasDeBuffs(AuraList.FearImunDeBuffs) == 0))
 		else 
-			return (not drCat or self(unitID):GetDR(drCat) > (drDiminishing or 0)) and (drCat ~= "fear" or self(unitID):HasDeBuffs(AuraList.FearImunDeBuffs) == 0)
+			return (not drCat or self(unitID):GetDR(drCat) > (DR_Tick or 0)) and (drCat ~= "fear" or (AuraList.FearImunDeBuffs and self(unitID):HasDeBuffs(AuraList.FearImunDeBuffs) == 0))
 		end 
 	end, "UnitID"),
 	-- CreatureType: Bool extenstion
@@ -2592,17 +5407,19 @@ A.Unit = PseudoClass({
 		end 
 	end, "UnitID"),
 	ThreatSituation							= Cache:Pass(function(self, otherunitID)  
-		-- @return number, number, number 
-		-- Returns: status (0 -> 3), percent of threat, value or threat 
+		-- @return number[, number, number]
+		-- Returns: status (0 -> 3)[, percent of threat, value or threat]
+		-- Note: latest two returns only works for Classic - TBC if ThreatLib loaded
 		-- Nill-able: otherunit
 		local unitID 						= self.UnitID
-		if unitID then 
-			local GUID 						= UnitGUID(unitID)					
+		if ThreatLib then 
+			local GUID 						= unitID and UnitGUID(unitID)			
+					
 			if GUID and TeamCachethreatData[GUID] then 
 				if otherunitID and not UnitIsUnit(otherunitID, TeamCachethreatData[GUID].unit) then 
 					-- By specified otherunitID
 					-- Note: I prefer avoid use this as much as it possible since less performance 
-					local _, status, scaledPercent, _, threatValue = UnitDetailedThreatSituation(unitID, otherunitID) 
+					local _, status, scaledPercent, _, threatValue = UnitDetailedThreatSituation(unitID, otherunitID) -- Lib modified to return by last argument unitGUID!
 					if threatValue and threatValue < 0 then
 						threatValue = threatValue + 410065408
 					end					
@@ -2612,8 +5429,12 @@ A.Unit = PseudoClass({
 					return TeamCachethreatData[GUID].status, TeamCachethreatData[GUID].scaledPercent, TeamCachethreatData[GUID].threatValue       
 				end 
 			end 
+			
+			return 0, 0, 0
 		end 
-		return 0, 0, 0
+		
+		local _, status, scaledPercent, _, threatValue = UnitDetailedThreatSituation(unitID, otherunitID or "target")
+		return UnitThreatSituation(unitID) or 0, scaledPercent or 0, threatValue or 0
 	end, "UnitID"),
 	IsTanking 								= Cache:Pass(function(self, otherunitID, range)  
 		-- @return boolean 
@@ -2627,7 +5448,7 @@ A.Unit = PseudoClass({
 		-- Nill-able: range
 		local unitID 						= self.UnitID
 		for unit in pairs(ActiveUnitPlates) do
-			local ThreatSituation 		= self(unitID):ThreatSituation() -- cacheed defaultly own target 
+			local ThreatSituation 			= self(unitID):ThreatSituation(unit)
 			if ((A.IsInPvP and UnitIsUnit(unitID, unit .. "target")) or (not A.IsInPvP and ThreatSituation >= 3)) and (not range or self(unit .. "target"):CanInterract(range)) then 
 				return true  
 			end
@@ -2656,42 +5477,67 @@ A.Unit = PseudoClass({
 		local unitID 						= self.UnitID
 		return select(2, self(unitID):GetCurrentSpeed())
 	end, "UnitGUID"),
-	GetTotalHealAbsorbs						= Cache:Pass(function(self) 
-		-- @return number 
-		-- Note: 
+	GetTotalHealAbsorbs						= Cache:Pass(function(self)
+		-- @return number
+		-- Note:
 		-- Returns the total amount of healing the unit can absorb without gaining health
 		-- Abilities like Necrotic Strike cause affected units to absorb healing without gaining health
 		local unitID 						= self.UnitID
-		return 0 -- TODO: Classic, currently is blank
+		return UnitGetTotalHealAbsorbs and UnitGetTotalHealAbsorbs(unitID) or 0
 	end, "UnitID"),
-	GetTotalHealAbsorbsPercent				= Cache:Pass(function(self) 
-		-- @return number 
+	GetTotalHealAbsorbsPercent				= Cache:Pass(function(self)
+		-- @return number
 		local unitID 						= self.UnitID
 		local maxHP							= self(unitID):HealthMax()
-		if maxHP == 0 then 
+		if maxHP == 0 then
 			return 0
-		else 
+		else
 			return self(unitID):GetTotalHealAbsorbs() * 100 / maxHP
-		end 
+		end
 	end, "UnitID"),
 	-- Combat: Diminishing
 	GetDR 									= Cache:Pass(function(self, drCat) 
-		-- @return: DR_Tick (@number), DR_Remain (@number), DR_Application (@number), DR_ApplicationMax (@number)
-		-- drDiminishing is Tick (number: 100 -> 50 -> 25 -> 0) where 0 is fully imun, 100% no imun - can be fully duration CC'ed 
+		-- @return: DR_Tick (@number), DR_Remain (@number: 0 -> 18), DR_Application (@number: 0 -> 5), DR_ApplicationMax (@number: 5 <-> 0)
+		-- DR_Tick is Tick (number: 100 -> 50 -> 25 -> 0) where 0 is fully imun, 100 is no imun
 		-- "taunt" has unique Tick (number: 100 -> 65 -> 42 -> 27 -> 0)
+		-- DR_Remain is remain in seconds time before DR_Application will be reset
+		-- DR_Application is how much DR stacks were applied currently and DR_ApplicationMax is how much by that category can be applied in total 
 		--[[ drCat accepts:
-			"incapacitate"
-			"silence"
-			"stun"							-- PvE unlocked  
-			"root"
-			"disarm"						-- Added in original DRList	
-			"random_stun"
-			"random_root"					-- May be removed in the future!
-			"fear"
-			"mind_control"
-			"frost_shock"
-			"kidney_shot"	
-		]]		
+			"disorient"						-- TBC Retail
+			"incapacitate"					-- Any
+			"silence"						-- WOTLK+ Retail
+			"stun"							-- Any
+			"random_stun"					-- non-Retail 
+			"taunt"							-- Retail 
+			"root"							-- Any 
+			"random_root"					-- non-Retail
+			"disarm"						-- Classic+ Retail
+			"knockback"						-- Retail
+			"counterattack"					-- TBC+ non-Retail
+			"chastise"						-- TBC 
+			"kidney_shot"					-- Classic TBC 
+			"unstable_affliction"			-- TBC 
+			"death_coil"					-- TBC 
+			"fear"							-- Classic+ non-Retail
+			"mind_control"					-- Classic+ non-Retail 
+			"horror"						-- WOTLK+ non-Retail
+			"opener_stun"					-- WOTLK 
+			"scatter"						-- TBC+ non-Retail
+			"cyclone"						-- WOTLK+ non-Retail
+			"charge"						-- WOTLK 
+			"deep_freeze_rof"				-- CATA+ non-Retail
+			"bind_elemental"				-- CATA+ non-Retail
+			"frost_shock"					-- Classic 
+			
+			non-Player unitID considered as PvE spells and accepts only: 
+			"stun", "kidney_shot"						-- Classic 
+			"stun", "random_stun", "kidney_shot"		-- TBC 
+			"stun", "random_stun", "opener_stun"		-- WOTLK 
+			"stun", "random_stun", "cyclone"			-- CATA 
+			"taunt", "stun"								-- Retail 
+			
+			Same note should be kept in Unit(unitID):IsControlAble, Unit(unitID):GetDR(), CombatTracker.GetDR(unitID)
+		]]
 		local unitID 						= self.UnitID
 		return CombatTracker:GetDR(unitID, drCat)
 	end, "UnitID"),
@@ -2855,16 +5701,19 @@ A.Unit = PseudoClass({
 		local unitID 						= self.UnitID
 		return UnitHasIncomingResurrection(unitID)
 	end, "UnitID"),
-	GetIncomingHeals						= Cache:Wrap(function(self, castTime, unitGUID)
+	GetIncomingHeals						= Cache:Pass(function(self, castTime, unitGUID)
 		-- @return number 
 		-- Nill-able: unitGUID
-		if not HealComm or not castTime or castTime <= 0 then 
+		local unitID 						= self.UnitID
+		if not HealComm then
+			return UnitGetIncomingHeals(unitID) or 0
+		end
+		
+		if not castTime or castTime <= 0 then 
 			return 0
 		end 
-		
-		local unitID 						= self.UnitID
-		local GUID 							= unitGUID or UnitGUID(unitID)
-		
+				
+		local GUID 							= unitGUID or UnitGUID(unitID)		
 		if not GUID then 
 			return 0 
 		end 
@@ -2874,13 +5723,16 @@ A.Unit = PseudoClass({
 	GetIncomingHealsIncSelf					= Cache:Wrap(function(self, castTime, unitGUID)
 		-- @return number 
 		-- Nill-able: unitGUID
-		if not HealComm or not castTime or castTime <= 0 then 
+		local unitID 						= self.UnitID
+		if not HealComm then
+			return UnitGetIncomingHeals(unitID) or 0
+		end		
+		
+		if not castTime or castTime <= 0 then 
 			return 0
 		end 
 		
-		local unitID 						= self.UnitID
 		local GUID 							= unitGUID or UnitGUID(unitID)
-		
 		if not GUID then 
 			return 0 
 		end 
@@ -2910,7 +5762,7 @@ A.Unit = PseudoClass({
 		local unitID 						= self.UnitID
 		local min_range 					= self(unitID):GetRange()
 		
-		return min_range > 0 and (min_range <= range or orBooleanInRange)	
+		return min_range and min_range > 0 and ((range and min_range <= range) or orBooleanInRange)	
 	end, "UnitID"),
 	CanInterrupt							= Cache:Pass(function(self, kickAble, auras, minX, maxX)
 		-- @return boolean 
@@ -2943,28 +5795,99 @@ A.Unit = PseudoClass({
 	end, "UnitID"),		
 	HasSpec									= Cache:Pass(function(self, specID)	
 		-- @return boolean 
-		-- Only PLAYER!
-		local unitID 						= "player"
-		if not UnitIsUnit(unitID, "player") then 
-			error("Can't use Action.Unit(" .. (unitID or "unitID") .. "):HasSpec(" .. (specID or "") .. ") since field 'unitID' must be equal to 'player'")
-			return 
-		end 
+		local unitID 						= self.UnitID
 		
-		if type(specID) == "table" then        
-			for i = 1, #specID do
-				if specID[i] == A.PlayerSpec then 
-					return true 
+		if UnitIsUnit(unitID, "player") then
+			local playerSpecID = A.PlayerSpec
+			if type(specID) == "table" then
+				for i = 1, #specID do if specID[i] == playerSpecID then return true end end
+			else
+				return specID == playerSpecID
+			end
+		else
+			local name, server = UnitName(unitID)
+			if not name then
+				return		
+			elseif server then
+				name = strjoin("-", name, server)
+			end
+			
+			if UnitSpecsMap[name] then
+				if type(specID) == "table" then
+					for i = 1, #specID do if specID[i] == UnitSpecsMap[name] then return true end end
+				else
+					return specID == UnitSpecsMap[name]
+				end
+			else
+				local unitClass = self(unitID):Class()
+				
+				-- Search by auras 
+				local unitClassBuffs = InfoClassSpecBuffs[unitClass]
+				if unitClassBuffs then 
+					local unitSpecBuffs
+					if type(specID) == "table" then
+						for i = 1, #specID do
+							unitSpecBuffs = unitClassBuffs[specID[i]]
+							if unitSpecBuffs and self(unitID):HasBuffs(unitSpecBuffs) > 0 then 
+								return true 
+							end 
+						end  
+					else
+						unitSpecBuffs = unitClassBuffs[specID]
+						if unitSpecBuffs and self(unitID):HasBuffs(unitSpecBuffs) > 0 then 
+							return true 
+						end 
+					end 
 				end 
-			end       
-		else 
-			return specID == A.PlayerSpec      
+				
+				-- Search by used spells 
+				-- Note: Used in PvP for any players. Doesn't work in PvE mode.
+				local unitClassSpells = InfoClassSpecSpells[unitClass]
+				if unitClassSpells then 
+					local unitSpecSpells
+					if type(specID) == "table" then
+						for i = 1, #specID do
+							unitSpecSpells = unitClassSpells[specID[i]]
+							
+							if unitSpecSpells then 
+								if type(unitSpecSpells) == "table" then 
+									for _, spellID in ipairs(unitSpecSpells) do 
+										if self(unitID):GetSpellCounter(spellID) > 0 then 
+											return true 
+										end 
+									end 
+								else 
+									if self(unitID):GetSpellCounter(unitSpecSpells) > 0 then 
+										return true 
+									end 
+								end 
+							end 
+						end  
+					else
+						unitSpecSpells = unitClassSpells[specID]
+						if unitSpecSpells then 
+							if type(unitSpecSpells) == "table" then 
+								for _, spellID in ipairs(unitSpecSpells) do 
+									if self(unitID):GetSpellCounter(spellID) > 0 then 
+										return true 
+									end 
+								end 
+							else 
+								if self(unitID):GetSpellCounter(unitSpecSpells) > 0 then 
+									return true 
+								end 
+							end 
+						end 
+					end 
+				end 				
+			end
 		end
 	end, "UnitID"),
 	HasFlags 								= Cache:Wrap(function(self) 
 		-- @return boolean 
 		local unitID 						= self.UnitID
 	    return self(unitID):HasBuffs(AuraList.Flags) > 0 
-	end, "UnitID"),
+	end, "UnitGUID"),
 	Health									= Cache:Pass(function(self)
 		-- @return number 
 		local unitID 						= self.UnitID
@@ -3048,47 +5971,62 @@ A.Unit = PseudoClass({
 		local unitID 						= self.UnitID
 	    return self(unitID):Power() * 100 / self(unitID):PowerMax()
 	end, "UnitID"),
-	AuraTooltipNumber						= Cache:Wrap(function(self, spell, filter)
-		-- @return number 
-		-- Nill-able: filter
+	AuraTooltipNumberByIndex				= Cache:Wrap(function(self, spell, filter, caster, byID, kindKey, requestedIndex)
+		-- @return number
+		-- Arguments
+		-- kindKey @string "applications"|"isStealable"|"sourceUnit"|"isNameplateOnly"|"isHelpful"|"name"|"canApplyAura"|"isHarmful"|"isRaid"|"timeMod"|"auraInstanceID"|"nameplateShowAll"|"nameplateShowPersonal"|"icon"|"points"(returns table)|"isFromPlayerOrPlayerPet"|"expirationTime"|"duration"|"isBossAura"|"spellId"
+		-- 		This argument used to identify instance of aura on tooltip (can be 2+ identical auras applied but with different attributes, example: procs from same weapon enchants on both hands) 
+		--
+		-- requestedIndex @number 
+		--		This argument selects number by using index on tooltip (can return 0 on index which is not supposed to be zero, just skipping such index by adding +1 will help)
+		-- Nill-able: filter, byID, kindKey, requestedIndex
 		local unitID 						= self.UnitID
-		local spellName 
-		if type(spell) == "number" then 
-			spellName = A_GetSpellInfo(spell)
-		else 
-			spellName = spell
+		local filter 						= filter or "HELPFUL"
+		local auraData, foundData, name 
+		for i = 1, huge do
+			auraData = UnitAura(unitID, i, filter)
+			if not auraData then 
+				break 
+			elseif IsAuraEqual(auraData.name, auraData.spellId, AssociativeTables[spell], byID) then
+				foundData = auraData
+				name = strlowerCache[auraData.name]
+				break
+			end
+		end
+				
+		if foundData then 
+			-- Since LARGE_NUMBER_SEPERATOR is no longer correct and TMW has no fix for this we will use AuraTooltipNumberPacked function by index for now instead of AuraTooltipNumber
+			local kindKey = kindKey or (filter ~= "HELPFUL" and "isHarmful") or "isHelpful"
+			local requestedIndex = requestedIndex or 1
+			return AuraTooltipNumberPacked(unitID, name, kindKey, caster, requestedIndex)
 		end 
 		
-		if filter then 
-			return AuraTooltipNumber(unitID, strlowerCache[spellName], filter) or 0
-		else 
-			local duration = AuraTooltipNumber(unitID, strlowerCache[spellName], "HELPFUL") or 0
-			if duration == 0 then 
-				duration = AuraTooltipNumber(unitID, strlowerCache[spellName], "HARMFUL") or 0
-			end 
-			return duration or 0
-		end 
+		return 0
 	end, "UnitGUID"),
-	AuraVariableNumber						= Cache:Wrap(function(self, spell, filter)
-		-- @return number 
-		-- Nill-able: filter
+	AuraVariableNumber						= Cache:Wrap(function(self, spell, filter, caster, byID)
+		-- @return number
+		-- Nill-able: filter, caster, byID
 		local unitID 						= self.UnitID
-		local spellName 
-		if type(spell) == "number" then 
-			spellName = A_GetSpellInfo(spell)
-		else 
-			spellName = spell
-		end 
+		local filter 						= filter or "HELPFUL"
+		local auraData, foundData
+		for i = 1, huge do
+			auraData = UnitAura(unitID, i, filter)
+			if not auraData then 
+				break 
+			elseif IsAuraEqual(auraData.name, auraData.spellId, AssociativeTables[spell], byID) and (not caster or UnitIsUnit("player", auraData.sourceUnit)) then
+				foundData = auraData
+				break
+			end
+		end
 		
-		if filter then 
-			return AuraVariableNumber(unitID, strlowerCache[spellName], filter) or 0
-		else 
-			local duration = AuraVariableNumber(unitID, strlowerCache[spellName], "HELPFUL") or 0
-			if duration == 0 then 
-				duration = AuraVariableNumber(unitID, strlowerCache[spellName], "HARMFUL") or 0
-			end 
-			return duration or 0
-		end 
+		if foundData then 
+			for i = 1, #foundData.points do
+				local v = foundData.points[i]
+				if v and v > 0 then return v end
+			end
+		end
+		
+		return 0
 	end, "UnitGUID"),
 	DeBuffCyclone 							= Cache:Pass(function(self)
 		-- @return number 
@@ -3114,12 +6052,20 @@ A.Unit = PseudoClass({
 		for i = 1, huge do			
 			spellName, _, spellCount, _, spellDuration, spellExpirationTime, _,_,_, spellID = UnitAura(unitID, i, filter)
 			
+			if type(spellName) == "table" then 		
+				spellCount = spellName.charges
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  
+			
 			if not spellName then 
 				break
 			elseif auraTable[spellID] then 
-				return auraTable[spellID], spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return auraTable[spellID], (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			elseif auraTable[spellName] then 
-				return auraTable[spellName], spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return auraTable[spellName], (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			end 
 		end 
 		
@@ -3145,10 +6091,18 @@ A.Unit = PseudoClass({
 		for i = 1, huge do			
 			spellName, _, spellCount, _, spellDuration, spellExpirationTime, _,_,_, spellID = UnitAura(unitID, i, filter)
 			
+			if type(spellName) == "table" then 
+				spellCount = spellName.charges
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break
 			elseif spellName == auraName then 
-				return spellID, spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return spellID, (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			end 
 		end 
 		
@@ -3198,10 +6152,17 @@ A.Unit = PseudoClass({
 		for i = 1, huge do 
 			spellName, _, _, _, spellDuration, spellExpirationTime, _, _, _, spellID = UnitAura(unitID, i, filter)
 			
+			if type(spellName) == "table" then 
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 			
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
-				local current_dur = spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time
+				local current_dur = (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time -- Classic only, don't touch
 				if current_dur > remain_dur then 
 					c = c + 1
 					remain_dur = current_dur
@@ -3230,6 +6191,13 @@ A.Unit = PseudoClass({
 		local _, spellName, spellID, spellCount		
 		for i = 1, huge do 
 			spellName, _, spellCount, _, _, _, _, _, _, spellID = UnitAura(unitID, i, filter)
+			
+			if type(spellName) == "table" then 
+				spellCount = spellName.charges
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 			
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
@@ -3249,17 +6217,25 @@ A.Unit = PseudoClass({
 		if debuff then 
 			filter = "HARMFUL PLAYER"
 		else 
-			filter = "HELPFUL PLAYER"
+			filter = "HELPFUL"
 		end 
 		
 		local duration = 0
 		local _, spellName, spellID, spellDuration, spellExpirationTime		
 		for i = 1, huge do 
 			spellName, _, _, _, spellDuration, spellExpirationTime, _, _, _, spellID = UnitAura(unitID, i, filter)
+			
+			if type(spellName) == "table" then 
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 			
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
-				duration = spellExpirationTime == 0 and 1 or ((spellExpirationTime - TMW.time) / spellDuration)
+				duration = (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and 1 or ((spellExpirationTime - TMW.time) / spellDuration) -- Classic only, don't touch
 				if duration <= 0.3 then 
 					return true 
 				end 
@@ -3288,12 +6264,20 @@ A.Unit = PseudoClass({
 		for i = 1, huge do			
 			spellName, _, spellCount, _, spellDuration, spellExpirationTime, _,_,_, spellID = UnitAura(unitID, i, filter)
 			
+			if type(spellName) == "table" then 
+				spellCount = spellName.charges
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 
 			elseif auraTable[spellID] then 
-				return auraTable[spellID], spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return auraTable[spellID], (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			elseif auraTable[spellName] then 
-				return auraTable[spellName], spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return auraTable[spellName], (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			end 
 		end 
 		
@@ -3316,10 +6300,18 @@ A.Unit = PseudoClass({
 		for i = 1, huge do			
 			spellName, _, spellCount, _, spellDuration, spellExpirationTime, _,_,_, spellID = UnitAura(unitID, i, filter)
 			
+			if type(spellName) == "table" then 
+				spellCount = spellName.charges
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break
 			elseif spellName == auraName then 
-				return spellID, spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration, spellCount
+				return spellID, (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration, spellCount -- Classic only, don't touch
 			end 
 		end 
 		
@@ -3330,7 +6322,7 @@ A.Unit = PseudoClass({
 		-- current remain, total applied duration	
 		-- Nill-able: caster, byID
 		local unitID 						= self.UnitID	
-		local filter -- default "HELPFUL"
+		local filter						= "HELPFUL"
 		if caster then 
 			filter = "HELPFUL PLAYER"
 		end 
@@ -3338,10 +6330,18 @@ A.Unit = PseudoClass({
 		local _, spellName, spellID, spellDuration, spellExpirationTime		
 		for i = 1, huge do 
 			spellName, _, _, _, spellDuration, spellExpirationTime, _, _, _, spellID = UnitAura(unitID, i, filter)
+			
+			if type(spellName) == "table" then 
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break  
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
-				return spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time, spellDuration
+				return (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time, spellDuration -- Classic only, don't touch
 			end 
 		end 
 		
@@ -3352,7 +6352,7 @@ A.Unit = PseudoClass({
 		-- Returns sorted by highest: current remain, total applied duration	
 		-- Nill-able: caster, byID
 		local unitID 						= self.UnitID	
-		local filter -- default "HELPFUL"
+		local filter 						= "HELPFUL"
 		if caster then 
 			filter = "HELPFUL PLAYER"
 		end 
@@ -3361,10 +6361,18 @@ A.Unit = PseudoClass({
 		local _, spellName, spellID, spellDuration, spellExpirationTime		
 		for i = 1, huge do 
 			spellName, _, _, _, spellDuration, spellExpirationTime, _, _, _, spellID = UnitAura(unitID, i, filter)
+			
+			if type(spellName) == "table" then 
+				spellDuration = spellName.duration
+				spellExpirationTime = spellName.expirationTime
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 			
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
-				local current_dur = spellExpirationTime == 0 and huge or spellExpirationTime - TMW.time
+				local current_dur = (spellExpirationTime == 0 or max(spellExpirationTime - TMW.time, 0) <= 0) and huge or spellExpirationTime - TMW.time -- Classic only, don't touch
 				if current_dur > remain_dur then 
 					remain_dur, total_dur = current_dur, spellDuration
 					if remain_dur == huge then 
@@ -3380,7 +6388,7 @@ A.Unit = PseudoClass({
 		-- @return number 
 		-- Nill-able: caster, byID
 		local unitID 						= self.UnitID	
-		local filter -- default "HELPFUL"
+		local filter 						= "HELPFUL"
 		if caster then 
 			filter = "HELPFUL PLAYER"
 		end 
@@ -3388,6 +6396,13 @@ A.Unit = PseudoClass({
 		local _, spellName, spellID, spellCount		
 		for i = 1, huge do 
 			spellName, _, spellCount, _, _, _, _, _, _, spellID = UnitAura(unitID, i, filter)
+			
+			if type(spellName) == "table" then 
+				spellCount = spellName.charges
+				spellID = spellName.spellId
+				spellName = spellName.name
+			end  			
+			
 			if not spellName then 
 				break 			
 			elseif AssociativeTables[spell][byID and spellID or spellName] then 
@@ -3540,7 +6555,7 @@ function A.Unit:New(UnitID, Refresh)
 		if error_snippet then 
 			error("Unit.lua Action.Unit():.. was used with 'nil' unitID. Found problem in TMW snippet here:" .. error_snippet, 0)
 		else 
-			error("Unit.lua Action.Unit():.. was used with 'nil' unitID. Failed to find TMW snippet stack error. Below must be shown level of stack 1.", 1)
+			error("Unit.lua Action.Unit():.. was used with 'nil' unitID.\n" .. debugstack())
 		end 		
 	end 
 	self.UnitID 	= UnitID
@@ -3619,7 +6634,7 @@ A.FriendlyTeam = PseudoClass({
 			end 
 		end
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") then
 			duration = A_Unit("player"):HasDeBuffs(spells) 
 			if duration ~= 0 then 
 				return duration, "player" 
@@ -3654,7 +6669,7 @@ A.FriendlyTeam = PseudoClass({
 			end 
 		end  
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") then
 			duration = A_Unit("player"):HasBuffs(spells) 
 			if duration ~= 0 then 
 				return duration, "player" 
@@ -3689,7 +6704,7 @@ A.FriendlyTeam = PseudoClass({
 			end 
 		end  
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") then
 			duration = A_Unit("player"):HasDeBuffs(spells) 
 			if duration ~= 0 then 
 				return duration, "player" 
@@ -3725,7 +6740,7 @@ A.FriendlyTeam = PseudoClass({
 			end                        
 		end  
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") and A_Unit("player"):TimeToDie() <= seconds then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") and A_Unit("player"):TimeToDie() <= seconds then
 			counter = counter + 1 
 			if counter >= count then 
 				return true, counter, "player"
@@ -3758,7 +6773,7 @@ A.FriendlyTeam = PseudoClass({
 			end                        
 		end  
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") then
 			value = value + A_Unit("player"):TimeToDie()
 			members = members + 1
 		end 	
@@ -3791,7 +6806,7 @@ A.FriendlyTeam = PseudoClass({
 			end 
 		end		
 		
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") and A_Unit("player"):HasBuffs(spells, source) == 0 then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") and A_Unit("player"):HasBuffs(spells, source) == 0 then
 			return true, "player"
 		end 		
 		
@@ -3819,7 +6834,7 @@ A.FriendlyTeam = PseudoClass({
 			end 
 		end 
 
-		if TeamCacheFriendly.Type ~= "raid" and CheckUnitByRole(ROLE, "player") and A_Unit("player"):CombatTime() > 0 and (not combatTime or A_Unit("player"):CombatTime() <= combatTime) then
+		if not TeamCacheFriendly.Type and CheckUnitByRole(ROLE, "player") and A_Unit("player"):CombatTime() > 0 and (not combatTime or A_Unit("player"):CombatTime() <= combatTime) then
 			return true, "player"
 		end 			
 		

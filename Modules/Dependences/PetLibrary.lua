@@ -85,27 +85,36 @@ local Listener							= A.Listener
 local Print								= A.Print
 local GetCL								= A.GetCL
 local MacroLibrary						= LibStub("MacroLibrary")
-local Lib 								= LibStub:NewLibrary("PetLibrary", 18)
-	  	  
+local Lib 								= LibStub:NewLibrary("PetLibrary", 29)
+
 local huge 								= math.huge	  
 local max 								= math.max
 local wipe 								= _G.wipe	  
 local isClassic							= A.StdUi.isClassic
 local owner								= isClassic and "PlayerClass" or "PlayerSpec"
+
+local C_CVar 							= _G.C_CVar
+local GetCVar 							= C_CVar and C_CVar.GetCVar or _G.GetCVar
+local SetCVar 							= C_CVar and C_CVar.SetCVar or _G.SetCVar
 	  
-local 	 IsActionInRange, 	 GetActionInfo,    PlaceAction,    ClearCursor,    GetCursorInfo, 	 GetPetFoodTypes, 	 GetSpellBookItemInfo, 	  PickupSpellBookItem, 	  PetHasSpellbook =
-	  _G.IsActionInRange, _G.GetActionInfo, _G.PlaceAction, _G.ClearCursor, _G.GetCursorInfo, _G.GetPetFoodTypes, _G.GetSpellBookItemInfo, _G.PickupSpellBookItem, _G.PetHasSpellbook	
+local C_SpellBook						= _G.C_SpellBook	  
+local C_Spell 							= _G.Spell
+local 	 IsActionInRange, 	 GetActionInfo,    PlaceAction,    ClearCursor,    GetCursorInfo, 	 GetPetFoodTypes, 	 													 GetSpellBookItemInfo, 	  									 		 		  GetSpellBookItemName,														  PickupSpellBookItem, 					  		  					  HasPetSpells,    PetHasSpellbook =
+	  _G.IsActionInRange, _G.GetActionInfo, _G.PlaceAction, _G.ClearCursor, _G.GetCursorInfo, _G.GetPetFoodTypes, C_SpellBook and C_SpellBook.GetSpellBookItemInfo or _G.GetSpellBookItemInfo, C_SpellBook and C_SpellBook.GetSpellBookItemName or _G.GetSpellBookItemName,	C_SpellBook and C_SpellBook.PickupSpellBookItem or _G.PickupSpellBookItem, C_SpellBook and C_SpellBook.HasPetSpells or _G.HasPetSpells, _G.PetHasSpellbook
 
 local GameLocale 						= _G.GetLocale()
 local GetUnitSpeed						= _G.GetUnitSpeed
 local CreateFrame						= _G.CreateFrame 	  
-local CombatLogGetCurrentEventInfo		= _G.CombatLogGetCurrentEventInfo	 
+local CombatLogGetCurrentEventInfo		= _G.CombatLogGetCurrentEventInfo or _G.C_CombatLog.GetCurrentEventInfo	 
 local InCombatLockdown					= _G.InCombatLockdown   
 local UnitGUID							= _G.UnitGUID
 local UnitName							= _G.UnitName	
 local UnitIsUnit						= _G.UnitIsUnit	
 local GARRISON_SWITCH_SPECIALIZATIONS	= _G.GARRISON_SWITCH_SPECIALIZATIONS or ""
-local MAX_ACTION_SLOTS					= 120
+local MAX_ACTION_SLOTS					= 120 -- Classic+ have 120 slots now
+
+local Enum								= _G.Enum
+local PET_BOOK							= Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Pet or (isClassic and BOOKTYPE_PET) or 1
 
 Lib.IsCallAble 							= true -- Default true for attemp to call pet as Hunter, after that we will know if its call able or not through error message 
 Lib.Food								= {
@@ -120,6 +129,7 @@ Lib.Data 								= {
 	isInitializedTrackers				= false,
 	isClassic							= isClassic,
 	owner								= owner,
+	KnownSpells							= {},
 	Actions								= {
 		--[[ Structure:
 		[owner] 						= { -- Retail: specID / Classic: classNameENG upper case
@@ -130,7 +140,7 @@ Lib.Data 								= {
 			},
 			Spells						= {
 				["spellName"]			= {
-					button 				= 0-MAX_ACTION_SLOTS,
+					button 				= 1-MAX_ACTION_SLOTS,
 					type				= "spell", "macro", nil,
 					id 					= actionID, nil,
 					subtype				= "petaction", nil,
@@ -139,7 +149,7 @@ Lib.Data 								= {
 			},
 			Buttons 					= {
 				[actionSlot]			= { -- Pointer to Spells["spellName"]					
-					button 				= 0-MAX_ACTION_SLOTS,
+					button 				= 1-MAX_ACTION_SLOTS,
 					type				= "spell", "macro", nil,
 					id 					= actionID, nil,
 					subtype				= "petaction", nil,
@@ -250,7 +260,23 @@ Lib.Data 								= {
 			},
 		},
 		[CONST.WARLOCK_DESTRUCTION or 267] 	= {},
+		[CONST.DEATHKNIGHT_BLOOD or 250] 	= {
+			[26125] = { -- TWW: Ghoul by Raise Dead if not taken override improvement
+				name = "Ghoul",
+				duration = 60,
+			},
+		},
+		[CONST.DEATHKNIGHT_FROST or 251] 	= {
+			[26125] = { -- TWW: Ghoul by Raise Dead if not taken override improvement
+				name = "Ghoul",
+				duration = 60,
+			},
+		},
 		[CONST.DEATHKNIGHT_UNHOLY or 252] 	= {
+			[26125] = { -- TWW: Ghoul by Raise Dead if not taken override improvement
+				name = "Ghoul",
+				duration = 60,
+			},		
 			[99541] = { -- talent All Will Serve
 				name = "Risen Skulker",
 				duration = huge,
@@ -259,7 +285,7 @@ Lib.Data 								= {
 				name = "Zombie",
 				duration = 20,
 			},
-		},
+		},		
 	},
 	FoodTypes							= setmetatable(
 		-- Formats localization to English locale
@@ -335,56 +361,56 @@ Lib.Data 								= {
 			},			
 			itIT				= {
 				-- Classic hasn't Italy language but dataBase refferenced their locales to koKR
-				["Carne"]				 = "Meat", 				-- [1]
-				["고기"]					 = "Meat", 				-- [1] Refference
-				["Pesce"]				 = "Fish", 				-- [2]
-				["생선"]				 	 = "Fish", 				-- [2] Refference
-				["Formaggio"]			 = "Cheese", 			-- [3]				
-				["치즈"]			 		 = "Cheese", 			-- [3] Refference			
-				["Pane"]				 = "Bread", 			-- [4]				
-				["빵"]					 = "Bread", 			-- [4] Refference				
-				["Funghi"]				 = "Fungus", 			-- [5]				
-				["버섯"]				 	 = "Fungus", 			-- [5] Refference			
-				["Frutta"]				 = "Fruit", 			-- [6]				
-				["과일"]				 	 = "Fruit", 			-- [6] Refference				
-				["Carne Cruda"]			 = "Raw Meat", 			-- [7]				
-				["날고기"]			 		 = "Raw Meat", 			-- [7] Refference				
-				["Pesce Crudo"]			 = "Raw Fish", 			-- [8]
-				["날생선"]			 		= "Raw Fish", 			-- [8] Refference
-				["Bocconcini Meccanici"] = "Mechanical Bits", 	-- [9] Retail 
+				["Carne"]				 	= "Meat", 				-- [1]
+				["고기"]						= "Meat", 				-- [1] Refference
+				["Pesce"]					= "Fish", 				-- [2]
+				["생선"]				 		= "Fish", 				-- [2] Refference
+				["Formaggio"]				= "Cheese", 			-- [3]				
+				["치즈"]			 			= "Cheese", 			-- [3] Refference			
+				["Pane"]					= "Bread", 			-- [4]				
+				["빵"]						= "Bread", 			-- [4] Refference				
+				["Funghi"]					= "Fungus", 			-- [5]				
+				["버섯"]				 		= "Fungus", 			-- [5] Refference			
+				["Frutta"]					= "Fruit", 			-- [6]				
+				["과일"]				 		= "Fruit", 			-- [6] Refference				
+				["Carne Cruda"]				= "Raw Meat", 			-- [7]				
+				["날고기"]			 	 		= "Raw Meat", 			-- [7] Refference				
+				["Pesce Crudo"]			 	= "Raw Fish", 			-- [8]
+				["날생선"]			 			= "Raw Fish", 			-- [8] Refference
+				["Bocconcini Meccanici"] 	= "Mechanical Bits", 	-- [9] Retail 
 			},
 			koKR				= {
-				["고기"]					= "Meat", 				-- [1] 
-				["생선"]					= "Fish", 				-- [2] 
-				["치즈"]					= "Cheese", 			-- [3]				
-				["빵"]					= "Bread", 				-- [4]	 			
-				["버섯"]					= "Fungus", 			-- [5] 				
-				["과일"]					= "Fruit", 				-- [6]	 			
-				["날고기"]					= "Raw Meat", 			-- [7]				
-				["날생선"]					= "Raw Fish", 			-- [8] 
-				["기계 부품"]				= "Mechanical Bits", 	-- [9] Retail 
+				["고기"]				= "Meat", 				-- [1] 
+				["생선"]				= "Fish", 				-- [2] 
+				["치즈"]				= "Cheese", 			-- [3]				
+				["빵"]				= "Bread", 				-- [4]	 			
+				["버섯"]				= "Fungus", 			-- [5] 				
+				["과일"]				= "Fruit", 				-- [6]	 			
+				["날고기"]				= "Raw Meat", 			-- [7]				
+				["날생선"]				= "Raw Fish", 			-- [8] 
+				["기계 부품"]			= "Mechanical Bits", 	-- [9] Retail 
 			},
 			zhCN				= {
-				["肉"]					= "Meat", 				-- [1] 
-				["鱼"]					= "Fish", 				-- [2] 
-				["奶酪"]				= "Cheese", 			-- [3]	 			
-				["面包"]				= "Bread", 				-- [4]	 			
-				["蘑菇"]				= "Fungus", 			-- [5] 				
-				["水果"]				= "Fruit", 				-- [6]				
-				["生肉"]				= "Raw Meat", 			-- [7]	 			
-				["生鱼"]				= "Raw Fish", 			-- [8] 
-				["机械零件"]				= "Mechanical Bits", 	-- [9] Retail 
+				["肉"]				= "Meat", 				-- [1] 
+				["鱼"]				= "Fish", 				-- [2] 
+				["奶酪"]			= "Cheese", 			-- [3]	 			
+				["面包"]			= "Bread", 				-- [4]	 			
+				["蘑菇"]			= "Fungus", 			-- [5] 				
+				["水果"]			= "Fruit", 				-- [6]				
+				["生肉"]			= "Raw Meat", 			-- [7]	 			
+				["生鱼"]			= "Raw Fish", 			-- [8] 
+				["机械零件"]			= "Mechanical Bits", 	-- [9] Retail 
 			},
 			zhTW				= {
-				["肉"]					= "Meat", 				-- [1] 
-				["魚"]					= "Fish", 				-- [2] 
-				["乳酪"]				= "Cheese", 			-- [3] 				
-				["麵包"]				= "Bread", 				-- [4] 				
-				["蘑菇"]				= "Fungus", 			-- [5] 				
-				["水果"]				= "Fruit", 				-- [6] 				
-				["生肉"]				= "Raw Meat", 			-- [7] 				
-				["生魚"]				= "Raw Fish", 			-- [8] 
-				["機械零件"]				= "Mechanical Bits", 	-- [9] Retail 
+				["肉"]				= "Meat", 				-- [1] 
+				["魚"]				= "Fish", 				-- [2] 
+				["乳酪"]			= "Cheese", 			-- [3] 				
+				["麵包"]			= "Bread", 				-- [4] 				
+				["蘑菇"]			= "Fungus", 			-- [5] 				
+				["水果"]			= "Fruit", 				-- [6] 				
+				["生肉"]			= "Raw Meat", 			-- [7] 				
+				["生魚"]			= "Raw Fish", 			-- [8] 
+				["機械零件"]			= "Mechanical Bits", 	-- [9] Retail 
 			},		
 		},
 		{
@@ -565,7 +591,12 @@ local function SetActionButton(spellName, actionSlot)
 		return "InCombatLockdown"
 	end 
 	
-	PickupSpellBookItem(spellName)
+	if C_SpellBook and C_SpellBook.PickupSpellBookItem then 
+		PickupSpellBookItem(Lib.Data.KnownSpells[spellName] or 0, PET_BOOK)
+	else 
+		PickupSpellBookItem(spellName)
+	end 
+	
 	if GetCursorInfo() == "petaction" then 
 		local slot 
 			
@@ -574,7 +605,7 @@ local function SetActionButton(spellName, actionSlot)
 			slot = actionSlot
 		else
 			local used 
-			for i = MAX_ACTION_SLOTS, 0, -1 do 
+			for i = MAX_ACTION_SLOTS, 1, -1 do 
 				used = GetActionInfo(i)
 				if not used then 
 					PlaceAction(i)
@@ -592,10 +623,10 @@ end
 
 local function UpdateActions(callbackEvent)
 	local Pointer = Lib.Data.Actions[A[owner]]
-	if Pointer then 
+	if Pointer and not Pointer.Config.Locked then 
 		Pointer.Config.Locked = true 
 		
-		for i = 0, #Pointer.Buttons do 
+		for i = 1, #Pointer.Buttons do 
 			wipe(Pointer.Buttons[i])
 		end
 		
@@ -604,8 +635,8 @@ local function UpdateActions(callbackEvent)
 		end
 		
 		local actionType, actionID, actionSubType, actionSpellName
-		local macroName, _, macroBody
-		for i = MAX_ACTION_SLOTS, 0, -1 do 
+		local macroName, _, macroBody, macroID
+		for i = MAX_ACTION_SLOTS, 1, -1 do 
 			actionType, actionID, actionSubType = GetActionInfo(i)
 			if actionID ~= 0 then 
 				if actionType == "spell" and actionSubType == "pet" then 
@@ -613,9 +644,17 @@ local function UpdateActions(callbackEvent)
 					actionSpellName = A_GetSpellInfo(actionID)
 				elseif actionType == "macro" then 
 					-- If it's macro we can check range only if spell learned 				
-					macroName, _, macroBody = MacroLibrary:GetInfo(actionID)
-					if macroBody and macroBody:find("#showtooltip\n/cast " .. macroName) then 
-						actionSpellName = macroName
+					macroName, _, macroBody, macroID = MacroLibrary:GetInfo(actionID, "ByActionMacros")
+					if not macroName then
+						macroName, _, macroBody, macroID = MacroLibrary:GetInfo(actionID)
+					end
+					
+					if macroBody then
+						if macroBody:find("#showtooltip\n/cast " .. macroName) then
+							actionSpellName = macroName
+						elseif Pointer.Spells[macroName] then
+							MacroLibrary:DeleteMacro(macroID)
+						end
 					end 
 				end 
 			end 
@@ -658,7 +697,7 @@ local function UpdateActions(callbackEvent)
 		for spellName in pairs(Pointer.Spells) do 
 			if not Pointer.Spells[spellName].button and Lib:IsSpellKnown(spellName) then 				
 				if Pointer.Config.useManagement then 
-					if not isClassic then 
+					if not isClassic then
 						-- Put by spell book 
 						errTemp, button 			= SetActionButton(spellName)
 
@@ -673,13 +712,12 @@ local function UpdateActions(callbackEvent)
 						-- Put by macro 
 						errTemp			 			= MacroLibrary:CraftMacro(spellName, nil, "#showtooltip\n/cast " .. spellName, true, true)
 						button			 			= MacroLibrary:SetActionButton(spellName)
-						
 						if errTemp and not Pointer.Config.useSilence then 
 							errTemp = spellName .. L.MACRO .. errTemp
 						end 
 					end 
 					
-					if button then 
+					if button then
 						Pointer.Buttons[button].button = button
 						Pointer.Buttons[button].type, Pointer.Buttons[button].id, Pointer.Buttons[button].subtype = GetActionInfo(button)	
 						-- Debug 
@@ -738,7 +776,7 @@ local function UpdateActions(callbackEvent)
 end 
 
 local function UpdateAction(i)
-	if i > MAX_ACTION_SLOTS or (not isClassic and (not A.IsOLDprofile or A_Unit("player"):GetSpellLastCast(GARRISON_SWITCH_SPECIALIZATIONS) > 0) and A_Unit("player"):GetSpellLastCast(GARRISON_SWITCH_SPECIALIZATIONS) < 0.5) then return end -- We don't need react on Target Possessed Action Bar or if we casted 'Change specialization'
+	if i == 0 or i > MAX_ACTION_SLOTS or (not isClassic and (not A.IsOLDprofile or A_Unit("player"):GetSpellLastCast(GARRISON_SWITCH_SPECIALIZATIONS) > 0) and A_Unit("player"):GetSpellLastCast(GARRISON_SWITCH_SPECIALIZATIONS) < 0.5) then return end -- We don't need react on Target Possessed Action Bar or if we casted 'Change specialization'
 	local Pointer = Lib.Data.Actions[A[owner]]
 	if Pointer and not Pointer.Config.Locked then 	
 		local actionSpellName, macroName, macroTexture, macroBody, macroBodyIsChanged
@@ -749,7 +787,7 @@ local function UpdateAction(i)
 				actionSpellName = A_GetSpellInfo(actionID)
 			elseif actionType == "macro" then 
 				-- If it's macro we can check range only if spell learned 				
-				macroName, macroTexture, macroBody = MacroLibrary:GetInfo(actionID)
+				macroName, macroTexture, macroBody = MacroLibrary:GetInfo(actionID, "ByActionMacros")
 				if macroBody and macroBody:find("#showtooltip\n/cast " .. macroName) then 
 					actionSpellName = macroName
 					if macroName ~= Pointer.Buttons[i].spellName or (Lib:IsSpellKnown(macroName) and macroTexture == 134400) then 
@@ -950,6 +988,45 @@ local function UpdateFoodType(...)
 	end 
 end 
 
+local function UpdateKnownSpells()
+	local KnownSpells = Lib.Data.KnownSpells
+	wipe(KnownSpells)
+	
+	local spellObj, spellName, spellID
+	for i = 1, (HasPetSpells() or 0) do -- HasPetSpells() is nil if pet does not have spellbook	
+		spellObj = GetSpellBookItemInfo(i, PET_BOOK) 
+		if type(spellObj) == "table" then
+			-- Retail
+			spellName = spellObj.name
+			spellID = spellObj.spellID
+		else
+			-- Classic+
+			spellName, _, spellID = GetSpellBookItemName(i, PET_BOOK)
+		end
+		
+		if spellName then 
+			KnownSpells[spellName] = i 
+		end 
+		
+		if spellID then 
+			KnownSpells[spellID] = i 
+		end 
+	end
+end 
+
+local function SPELLS_CHANGED()	
+	local cvar = GetCVar("spellBookHidePassives")
+	SetCVar("spellBookHidePassives", "0")
+	
+	UpdateKnownSpells()
+	if PetHasSpellbook() then
+		UpdateActions()
+	end
+
+	SetCVar("spellBookHidePassives", cvar)
+end
+Listener:Add("ACTION_EVENT_PET_LIBRARY_ACTIONS", "SPELLS_CHANGED", SPELLS_CHANGED)
+
 local function UpdateMainPet()
 	UpdateFoodType(GetPetFoodTypes())		
 	
@@ -1016,22 +1093,22 @@ local function UpdateMainPet()
 	end 
 end 
 
-local eventFiredCount, eventFiredLastTime = 0, 0
-local function UNIT_PET(unitID)
-	if unitID == "player" then 
-		-- Game fires event twice in same second, this code should prevent it and work as the clocks
-		if TMW.time - eventFiredLastTime > 1 then 
-			eventFiredCount = 0
-		elseif eventFiredCount == 0 then -- Super rare situation when event fires 3 times instead of 4 at same second 
-			eventFiredCount = 1
-		end 
+local eventFiredCount = 0
+local function UNIT_PET(unitID)	
+	if unitID == "player" then
 		eventFiredCount = eventFiredCount + 1
-		eventFiredLastTime = TMW.time 
-		if eventFiredCount >= 2 then 
+		
+		-- On PLAYER_LOGIN
+		if eventFiredCount == 1 then
 			UpdateMainPet()
-			UpdateActions()
-			eventFiredCount = 0
-		end 
+		end
+		
+		-- On RELOAD or UPDATE
+		-- Event fired twice in a row, this code should prevent it and work as the clocks
+		if eventFiredCount % 2 == 0 then
+			-- On even tick when pet info is available
+			UpdateMainPet()
+		end
 	end 
 end 
 Listener:Add("ACTION_EVENT_PET_LIBRARY_UNIT_PET", "UNIT_PET", UNIT_PET)
@@ -1203,7 +1280,7 @@ function Lib:AddActionsSpells(owner, spells, useManagement, useSilence, delMacro
 			Buttons  			 		= {},
 		}
 		
-		for i = 0, MAX_ACTION_SLOTS do 
+		for i = 1, MAX_ACTION_SLOTS do 
 			self.Data.Actions[owner].Buttons[i] = {}
 		end 
 	else 
@@ -1214,18 +1291,8 @@ function Lib:AddActionsSpells(owner, spells, useManagement, useSilence, delMacro
 		self.Data.Actions[owner].Spells[GetSpellName(spells[i])] = tSpellsEmpty
 	end 		
 	
-	-- Refresh manual PLAYER_LOGIN event since UNIT_PET event triggers only one time at start up
-	if not self.isInitializedActions then 
-		eventFiredLastTime = TMW.time 
-		eventFiredCount = max(eventFiredCount, 1) + 1
-		A.GetLocalization() 			-- Forced to get actual CL 
-		if eventFiredCount >= 2 then 	-- Bug fix on event PLAYER_LOGIN due of how UNIT_PET implemented..
-			UpdateMainPet()
-			UpdateActions()
-			eventFiredCount = 0
-		end 		
-		self.isInitializedActions = true 
-	end 
+	-- Forced to get actual CL for notifications
+	A.GetLocalization()
 	
 	-- Register events
 	Listener:Add("ACTION_EVENT_PET_LIBRARY_ACTIONS", "ACTIONBAR_SLOT_CHANGED",  		UpdateAction													)
@@ -1413,7 +1480,12 @@ function Lib:IsSpellKnown(spell)
 	-- usage: Lib:IsSpellKnown(@table object-action, @string, @number)
 	-- 'spell' accepts spellName, spellID and Action.Object
 	-- Note: Pet must be active i.e. exists and alive to have it working
-	return GetSpellBookItemInfo(GetSpellName(spell)) and true -- Only this function is best way to check if spell known so far 
+	if C_SpellBook and C_SpellBook.GetSpellBookItemInfo then 
+		return self.Data.KnownSpells[GetSpellName(spell)] and true 
+	else 
+		return GetSpellBookItemInfo(GetSpellName(spell)) and true -- DON'T TOUCH THIS AS WHILE ITS STILL AVAILABLE ON CLASSIC+ IT CAN CHECK IN REAL-TIME IF NOT SPECIFIED SECOND ARGUMENT
+	end 
+	-- Only this function is best way to check if spell known so far 
 end 
 
 function Lib:GetRemainDuration(pet)

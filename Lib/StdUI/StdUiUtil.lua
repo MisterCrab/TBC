@@ -4,7 +4,7 @@ if not StdUi then
 	return
 end
 
-local module, version = 'Util', 10;
+local module, version = 'Util', 12;
 if not StdUi:UpgradeNeeded(module, version) then
 	return
 end
@@ -110,7 +110,14 @@ StdUi.Util = {
 	spellValidator      = function(self)
 		local text = self:GetText();
 		text = text:trim();
-		local name, _, icon, _, _, _, spellId = GetSpellInfo(text);
+		local name, _, icon, _, _, _, spellId
+		if C_Spell then
+			name = C_Spell.GetSpellInfo(text).name;
+			icon = C_Spell.GetSpellInfo(text).iconID;
+			spellId = C_Spell.GetSpellInfo(text).spellID;
+		else
+			name, _, icon, _, _, _, spellId = GetSpellInfo(text)
+		end
 
 		if not name then
 			self.stdUi:MarkAsValid(self, false);
@@ -184,6 +191,23 @@ StdUi.Util = {
 		end
 
 		return output:trim();
+	end,
+	
+	formatTime         = function(totalTime)
+		local days = floor(totalTime/86400)
+		local hours = floor(mod(totalTime, 86400)/3600)
+		local minutes = floor(mod(totalTime,3600)/60)
+		local seconds = floor(mod(totalTime,60))
+
+		if (days > 0) then
+			return format("%dd %02dh %02dm %02ds",days,hours,minutes,seconds)
+		elseif (hours > 0) then
+			return format("%02dh %02dm %02ds",hours,minutes,seconds)
+		elseif (minutes > 0) then
+			return format("%02dm %02ds",minutes,seconds)
+		elseif (seconds > 0) then
+			return format("%02ds", seconds)
+		end 
 	end,
 
 	stripColors         = function(text)

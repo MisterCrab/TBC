@@ -1,3 +1,13 @@
+[Warlock v9]
+Fixed endless summon on AUTO mode
+
+[Warlock v8]
+Optimized code for MetaEngine release
+Optimized code for 5-Unit system release
+
+[Warlock v7]
+Fixed issue when main DoTs doesn't applies in rare situation
+
 [Warlock v6]
 Removed retired interrupt groups
 Upgraded code for synchronization with new BossMods

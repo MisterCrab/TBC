@@ -1,8 +1,9 @@
-local _G, next		 							= 
-	  _G, next
+local _G, next, pcall		 					= 
+	  _G, next, pcall
 	  
 local A 										= _G.Action
 local Listener 									= A.Listener
+local CombatTracker								= A.CombatTracker
 
 local TeamCache									= A.TeamCache
 local TeamCacheFriendly							= TeamCache.Friendly
@@ -38,7 +39,7 @@ local function GetGUID(unitID)
 end 
 
 local function UnitInspectItem(unitID, invID)
-    if UnitPlayerControlled(unitID) and CheckInteractDistance(unitID, 1) and CanInspect(unitID, false) and not UnitIsUnit("player", unitID) then  
+    if CombatTracker:CombatTime("player") == 0 and UnitPlayerControlled(unitID) and CheckInteractDistance(unitID, 1) and CanInspect(unitID, false) and not UnitIsUnit("player", unitID) then  
 		local GUID = GetGUID(unitID)
 		if not GUID then 
 			return 
@@ -55,14 +56,14 @@ local function UnitInspectItem(unitID, invID)
 		-- Open inspect frame 
 		--if not _G.InspectFrame or not _G.InspectFrame:IsShown() then 
 			-- ByPass game errors depend on language, English game is OKAY, game devs missed to fix for different languages inspect 			
-			if not AllowedLocale[GameLocale] then 
-				scriptErrors = GetCVar("scriptErrors")
-				if scriptErrors and scriptErrors ~= "0" then 
-					SetCVar("scriptErrors", 0)
-				end 				
-			end 
+			--if not AllowedLocale[GameLocale] then 
+			--	scriptErrors = GetCVar("scriptErrors")
+			--	if scriptErrors and scriptErrors ~= "0" then 
+			--		SetCVar("scriptErrors", 0)
+			--	end 				
+			--end 
 						
-			InspectUnit(unitID)				
+			pcall(InspectUnit, unitID)				
 		--end 
 		
 		-- Getting info from inspect frame 
@@ -120,8 +121,14 @@ local function UnitInspectWipe(...)
 	end 
 end 
 
-Listener:Add("ACTION_EVENT_UNIT_INSPECT", "PLAYER_REGEN_ENABLED", 		UnitInspectWipe)
-Listener:Add("ACTION_EVENT_UNIT_INSPECT", "UNIT_INVENTORY_CHANGED",		UnitInspectWipe)
+Listener:Add("ACTION_EVENT_UNIT_INSPECT", "PLAYER_REGEN_ENABLED", 		   UnitInspectWipe)
+Listener:Add("ACTION_EVENT_UNIT_INSPECT", "UNIT_INVENTORY_CHANGED",		   UnitInspectWipe)
+Listener:Add("ACTION_EVENT_UNIT_INSPECT", "PLAYER_ENTERING_WORLD",	function()
+	-- Fix for ruRU, this global is removed, causes error in Localizations.lua from Blizzard_InspectUI
+	_G.SpecializationSpecName = _G.SpecializationSpecName or { SetFontObject = function() end }
+	_G.InspectFrame_LoadUI()
+	Listener:Remove("ACTION_EVENT_UNIT_INSPECT", "PLAYER_ENTERING_WORLD")	
+end)
 
 
 -------------------------------------------------------------------------------

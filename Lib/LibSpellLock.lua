@@ -1,3 +1,5 @@
+local CombatLogGetCurrentEventInfo = _G.CombatLogGetCurrentEventInfo or _G.C_CombatLog.GetCurrentEventInfo
+
 --[================[
 LibSpellLocks-1.0
 Author: d87
@@ -5,7 +7,7 @@ Description: Provides information about spell lock status after successful inter
 --]================]
 
 
-local MAJOR, MINOR = "LibSpellLocks", 3
+local MAJOR, MINOR = "LibSpellLocks", 7.1 -- 7 is actual release, this is hotfixed version
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
@@ -20,9 +22,8 @@ local callbacks = lib.callbacks
 local interrupts = lib.interrupts
 local activeSpellLocks = lib.activeSpellLocks
 local data = interrupts
-local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local UnitGUID = UnitGUID
-local UnitAura = UnitAura
+local UnitAura = _G.TMW.UnitAura or _G.UnitAura or _G.C_UnitAuras.GetAuraDataByIndex
 local GetTime = GetTime
 local C_Timer_After = C_Timer.After
 
@@ -44,9 +45,7 @@ local function Interrupt( id, name, duration )
     end
 end
 
-local isClassic = select(4,GetBuildInfo()) <= 19999
-
-if not isClassic then
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
     -------------------
     -- LIVE
     -------------------
@@ -61,7 +60,7 @@ if not isClassic then
     Interrupt(47528, "Mind Freeze", 3)
     Interrupt(2139, "Counterspell", 6)
     Interrupt(96231, "Rebuke", 4)
-    Interrupt(106839, "Skull Bash", 4)
+    Interrupt(93985, "Skull Bash", 4) -- Unlike most classes Skull bash interrupt id is different from spellbook id
     Interrupt(183752, "Disrupt", 3)
     Interrupt(187707, "Muzzle", 3)
     Interrupt(147362, "Counter Shot", 3)
@@ -82,7 +81,35 @@ if not isClassic then
 
     -- Trial of Crusader Champions
     -- Interrupt(65973, "Earth Shock", 3)
-else
+
+elseif WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC then 
+    ----------------------------
+    -- WOTLK CLASSIC
+    ----------------------------
+    Interrupt(19244, "Spell Lock", 5) -- Rank 1
+    Interrupt(19647, "Spell Lock", 6) -- Rank 2
+    Interrupt(57994, "Wind Shear", 2)
+    Interrupt(16979, "Feral Charge", 4)
+    Interrupt(2139, "Counterspell", 8)
+    Interrupt(1766, "Kick", 5)
+    Interrupt(6552, "Pummel", 4)
+    Interrupt(72, "Shield Bash", 6)
+    Interrupt(47528, "Mind Freeze", 4)
+
+elseif WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC then
+    ----------------------------
+    -- BURNING CRUSADE CLASSIC
+    ----------------------------
+    Interrupt(19244, "Spell Lock", 6) -- Rank 1
+    Interrupt(19647, "Spell Lock", 8) -- Rank 2
+    Interrupt({ 8042, 8044, 8045, 8046, 10412, 10413, 10414, 25454 }, "Earth Shock", 2)
+    Interrupt(16979, "Feral Charge", 4)
+    Interrupt(2139, "Counterspell", 8)
+    Interrupt({ 1766, 1767, 1768, 1769, 38768 }, "Kick", 5)
+    Interrupt({ 6552, 6554 }, "Pummel", 4)
+    Interrupt({ 72, 1671, 1672, 29704 }, "Shield Bash", 6)
+
+elseif WOW_PROJECT_ID == WOW_PROJECT_CLASSIC then
     -------------------
     -- CLASSIC
     -------------------
@@ -94,6 +121,29 @@ else
     Interrupt({ 1766, 1767, 1768, 1769 }, "Kick", 5)
     Interrupt({ 6552, 6554 }, "Pummel", 4)
     Interrupt({ 72, 1671, 1672 }, "Shield Bash", 6)
+
+    --SoD
+    Interrupt(425609, "Rebuke", 2)
+    Interrupt(410176, "Skull Bash", 2)
+	
+else --temp fix until original lib is updated
+    ----------------------------
+    -- CATA & MOP CLASSIC
+    ----------------------------
+    Interrupt(19647, "Spell Lock", 3) 
+    Interrupt(57994, "Wind Shear", 2)
+    Interrupt(80964, "Skull Bash(Bear Form)", 4)
+    Interrupt(80965, "Skull Bash(Cat Form)", 4)
+    Interrupt(78675, "Solar Beam", 10)
+    Interrupt(34490, "Silencing Shot", 3)
+    Interrupt(2139, "Counterspell", 7)
+    Interrupt(15487, "Silence", 5)
+    Interrupt(1766, "Kick", 5)
+    Interrupt(6552, "Pummel", 4)
+    Interrupt(96231, "Rebuke", 4)
+    Interrupt(47528, "Mind Freeze", 4)
+    Interrupt(91802, "Shambling Rush", 2) 	
+	
 end
 
 
@@ -125,6 +175,9 @@ end
 -- local function FindAurByaSpellID(spellID, unit, filter)
 --     for i=1, 100 do
 --         local auraSpellID = select(10, UnitAura(unit, i, filter))
+--			if type(auraSpellID) == "table" then 			
+--				auraSpellID = auraSpellID.spellId
+--			end  		
 --         if not auraSpellID then return end
 --         if auraSpellID == spellID then return i end
 --     end

@@ -1,17 +1,15 @@
+--[[
 -------------------------------------------------------------------------------
 -- Introduction 
 -------------------------------------------------------------------------------
---[[
 If you plan to build profile without use lua then you can skip this guide
 Important to create mouseover, focus, focustarget, targettarget toggles as Checkbox as on their state will relly many things in API
-]]
 
 -------------------------------------------------------------------------------
 -- №1: Create snippet 
 -------------------------------------------------------------------------------
---[[
 Write in chat "/tmw options" > LUA Snippets > Profile (left side) > "+" > Write name "ProfileUI" in title of the snippet
-]]
+--]]
 
 -------------------------------------------------------------------------------
 -- №2: Set profile defaults 

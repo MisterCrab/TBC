@@ -1,3 +1,16 @@
+[Rogue v17]
+Fixed ApplyPoisons for MetaEngine
+
+[Rogue v16]
+OilofImmolation									- Fixed wrong Type
+Optimized code for MetaEngine release
+Optimized code for 5-Unit system release
+
+[Rogue v15]
+SwordSpecialization								- Updated tooltip description for Trick
+OilofImmolation									- Added in rotation with slider in PvE section of the Warrior tab
+AutoTarget										- Updated for range API changes
+
 [Rogue v14]
 Added checkbox "SliceandDice 100% uptime" that will try to keep buff up as long as it's possible
 Stealth											- Removed mouseover unit trigger

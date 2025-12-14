@@ -1,48 +1,51 @@
-local ADDON_NAME 			= ...
-local PathToGreenTGA		= [[Interface\AddOns\]] .. ADDON_NAME .. [[\Media\Green.tga]]
+local ADDON_NAME 				= ...
+local PathToGreenTGA			= [[Interface\AddOns\]] .. ADDON_NAME .. [[\Media\Green.tga]]
 
 local _G, type, next, pairs, ipairs, select, unpack, table, setmetatable, math, string, error = 	
 	  _G, type, next, pairs, ipairs, select, unpack, table, setmetatable, math, string, error
 	  
-local maxn					= table.maxn
-local tinsert 				= table.insert		
-local tsort 				= table.sort
-local strgsub				= string.gsub
-local strgmatch				= string.gmatch
-local strlen				= string.len
-local huge 					= math.huge
-local wipe 					= _G.wipe
-local hooksecurefunc		= _G.hooksecurefunc	  
+local maxn						= table.maxn
+local tinsert 					= table.insert		
+local tsort 					= table.sort
+local strgsub					= string.gsub
+local strgmatch					= string.gmatch
+local strlen					= string.len
+local huge 						= math.huge
+local wipe 						= _G.wipe
+local hooksecurefunc			= _G.hooksecurefunc	  
 	  
-local TMW 					= _G.TMW
-local CNDT 					= TMW.CNDT
-local Env 					= CNDT.Env
+local TMW 						= _G.TMW
+local CNDT 						= TMW.CNDT
+local Env 						= CNDT.Env
 
-local A   					= _G.Action	
-local CONST 				= A.Const
-local Listener				= A.Listener
-local toNum 				= A.toNum
-local UnitCooldown			= A.UnitCooldown
-local CombatTracker			= A.CombatTracker
-local Unit					= A.Unit 
-local Player				= A.Player 
-local LoC 					= A.LossOfControl
-local MultiUnits			= A.MultiUnits
-local GetToggle				= A.GetToggle
-local BurstIsON				= A.BurstIsON
-local Enum 					= A.Enum
-local TriggerGCD			= Enum.TriggerGCD
-local SpellDuration			= Enum.SpellDuration
-local SpellProjectileSpeed	= Enum.SpellProjectileSpeed
+local A   						= _G.Action	
+local CONST 					= A.Const
+local Listener					= A.Listener
+local toNum 					= A.toNum
+local UnitCooldown				= A.UnitCooldown
+local CombatTracker				= A.CombatTracker
+local Unit						= A.Unit 
+local Player					= A.Player 
+local LoC 						= A.LossOfControl
+local MultiUnits				= A.MultiUnits
+local GetToggle					= A.GetToggle
+local BurstIsON					= A.BurstIsON
+local BuildToC					= A.BuildToC
+local Enum 						= A.Enum
+local TriggerGCD				= Enum.TriggerGCD
+local SpellDuration				= Enum.SpellDuration
+local SpellProjectileSpeed		= Enum.SpellProjectileSpeed
+local SpellBookSpellBankPet 	= _G.Enum.SpellBookSpellBank.Pet
+local SpellBookSpellBankPlayer 	= _G.Enum.SpellBookSpellBank.Player
 
-local TRINKET1				= CONST.TRINKET1
-local TRINKET2				= CONST.TRINKET2
-local POTION				= CONST.POTION
-local EQUIPMENT_MANAGER		= CONST.EQUIPMENT_MANAGER
-local CACHE_DEFAULT_TIMER	= CONST.CACHE_DEFAULT_TIMER
-local SPELLID_FREEZING_TRAP = CONST.SPELLID_FREEZING_TRAP
+local TRINKET1					= CONST.TRINKET1
+local TRINKET2					= CONST.TRINKET2
+local POTION					= CONST.POTION
+local EQUIPMENT_MANAGER			= CONST.EQUIPMENT_MANAGER
+local CACHE_DEFAULT_TIMER		= CONST.CACHE_DEFAULT_TIMER
+local SPELLID_FREEZING_TRAP 	= CONST.SPELLID_FREEZING_TRAP
 
-local LibStub				= _G.LibStub
+local LibStub					= _G.LibStub
 
 -------------------------------------------------------------------------------
 -- Remap
@@ -92,7 +95,7 @@ local isSpellRangeException = {
 	[20572]		= true,
 	[33702]		= true,	
 }
-local ItemHasRange 			= ItemHasRange
+local ItemHasRange 			= _G.ItemHasRange or _G.C_Item.ItemHasRange
 local isItemRangeException 	= {
 	[19950] = true,
 	[18820] = true,
@@ -104,36 +107,51 @@ local itemCategory 			= {
 	[19950] = "BOTH",
 	[18820] = "BOTH",
 }
-	  	  	  
+
 local GetNetStats 			= _G.GetNetStats  	
 local GameLocale 			= _G.GetLocale()
-local GetCVar				= _G.GetCVar or _G.C_CVar.GetCVar
+local C_CVar				= _G.C_CVar
+local SetCVar				= C_CVar and C_CVar.SetCVar or _G.SetCVar
+local GetCVar				= C_CVar and C_CVar.GetCVar or _G.GetCVar
 
 -- Spell 
+local C_Spell				= _G.C_Spell
 local Spell					= _G.Spell
 
-local 	 IsPlayerSpell,    IsUsableSpell, 	 IsHelpfulSpell, 	IsHarmfulSpell,    IsAttackSpell, 	 IsCurrentSpell =
-	  _G.IsPlayerSpell, _G.IsUsableSpell, _G.IsHelpfulSpell, _G.IsHarmfulSpell, _G.IsAttackSpell, _G.IsCurrentSpell
+local C_SpellBook			= _G.C_SpellBook
 
-local 	  GetSpellTexture, 	  GetSpellLink,    GetSpellInfo, 	GetSpellDescription, 	GetSpellCount,	   GetSpellPowerCost, 	  CooldownDuration,    GetSpellCharges,    GetHaste, 	GetShapeshiftFormCooldown, 	  GetSpellBaseCooldown,    GetSpellAutocast = 
-	  TMW.GetSpellTexture, _G.GetSpellLink, _G.GetSpellInfo, _G.GetSpellDescription, _G.GetSpellCount, 	_G.GetSpellPowerCost, Env.CooldownDuration, _G.GetSpellCharges, _G.GetHaste, _G.GetShapeshiftFormCooldown, _G.GetSpellBaseCooldown, _G.GetSpellAutocast
+local                                         IsUsableSpell,                                          IsHelpfulSpell,                                          IsHarmfulSpell,                                             IsAttackSpell,                                          IsCurrentSpell,             IsSpellKnown =
+	  C_Spell and C_Spell.IsSpellUsable or _G.IsUsableSpell, C_Spell and C_Spell.IsSpellHelpful or _G.IsHelpfulSpell, C_Spell and C_Spell.IsSpellHarmful or _G.IsHarmfulSpell, C_Spell and C_Spell.IsAutoAttackSpell or _G.IsAttackSpell, C_Spell and C_Spell.IsCurrentSpell or _G.IsCurrentSpell, C_SpellBook.IsSpellKnown	
+
+local IsPlayerSpell 				= _G.IsPlayerSpell or function(spellID)
+	return IsSpellKnown(spellID, SpellBookSpellBankPlayer)
+end
+
+local 	  GetSpellTexture, 	  									  GetSpellLink,    									   GetSpellInfo, 											   GetSpellDescription, 											GetSpellCount,	   											GetSpellPowerCost, 	  CooldownDuration,    										   GetSpellCharges,    GetHaste, 	GetShapeshiftFormCooldown, 	  GetSpellBaseCooldown,    										   GetSpellAutocast = 
+	  TMW.GetSpellTexture, C_Spell and C_Spell.GetSpellLink or _G.GetSpellLink, C_Spell and C_Spell.GetSpellInfo or _G.GetSpellInfo, C_Spell and C_Spell.GetSpellDescription or _G.GetSpellDescription, C_Spell and C_Spell.GetSpellCastCount or _G.GetSpellCount, 	C_Spell and C_Spell.GetSpellPowerCost or _G.GetSpellPowerCost, Env.CooldownDuration, C_Spell and C_Spell.GetSpellCharges or _G.GetSpellCharges, _G.GetHaste, _G.GetShapeshiftFormCooldown, _G.GetSpellBaseCooldown, C_Spell and C_Spell.GetSpellAutoCast or _G.GetSpellAutocast
 
 -- Item 	  
-local 	 IsUsableItem, 	  IsHelpfulItem, 	IsHarmfulItem, 	  IsCurrentItem  =
-	  _G.IsUsableItem, _G.IsHelpfulItem, _G.IsHarmfulItem, _G.IsCurrentItem
+local C_Item 						= _G.C_Item
+local 	 								   IsUsableItem, 	 								   IsHelpfulItem, 					IsHarmfulItem, 	  														 IsCurrentItem =
+	  C_Item and C_Item.IsUsableItem or _G.IsUsableItem, C_Item and C_Item.IsHelpfulItem or _G.IsHelpfulItem, C_Item and C_Item.IsHarmfulItem or _G.IsHarmfulItem, C_Item and C_Item.IsCurrentItem or _G.IsCurrentItem
   
-local 	 GetItemInfo, 	 GetItemIcon, 	 GetItemInfoInstant, 	GetItemSpell = 
-	  _G.GetItemInfo, _G.GetItemIcon, _G.GetItemInfoInstant, _G.GetItemSpell	  
+local 	 								  GetItemInfo, 	 									   GetItemIcon, 	  									   GetItemInfoInstant, 	 								    GetItemSpell = 
+	  C_Item and C_Item.GetItemInfo or _G.GetItemInfo, C_Item and C_Item.GetItemIconByID or _G.GetItemIcon, C_Item and C_Item.GetItemInfoInstant or _G.GetItemInfoInstant, C_Item and C_Item.GetItemSpell or _G.GetItemSpell	
 
 -- Talent	  
 local TalentMap 					= A.TalentMap 
 
 -- Rank 
-local GetSpellBookItemName			= _G.GetSpellBookItemName
+local GetSpellBookItemName			= _G.GetSpellBookItemName or C_SpellBook.GetSpellBookItemName
 local FindSpellBookSlotBySpellID 	= _G.FindSpellBookSlotBySpellID
 
 -- Unit 	  
-local UnitAura						= _G.UnitAura
+local UnitAura						= _G.UnitAura or _G.C_UnitAuras.GetAuraDataByIndex
+-- Classic: UnitAura override through LibClassicDurations. Only for buffs on other units because debuffs are available since 1.15.
+if BuildToC < 20000 then
+	UnitAura						= A.UnitAura or TMW.UnitAura or UnitAura
+end
+
 local 	 UnitIsUnit, 	UnitGUID	= 
 	  _G.UnitIsUnit, _G.UnitGUID 
 
@@ -156,12 +174,7 @@ do
 		
 		if not isRoots then 
 			IsBreakAbleDeBuff[tempTable[j]] = true 
-			local spellName = GetSpellInfo(tempTable[j])
-			if not spellName then 
-				error("Need to delete " .. tempTable[j])
-			else 
-				IsBreakAbleDeBuff[spellName] = true 
-			end 
+			IsBreakAbleDeBuff[GetSpellInfo(tempTable[j])] = true 
 		end 
 	end 
 end 
@@ -271,10 +284,15 @@ local spellpowercache = setmetatable(
 	}, 
 	{ 
 		__index = function(t, v)
-			local pwr = GetSpellPowerCost(A.GetSpellInfo(v))
-			if pwr and pwr[1] then
-				t[v] = { pwr[1].cost, pwr[1].type }
-				return t[v]
+			local pwr = v and GetSpellPowerCost(v)
+			if pwr then 
+				if pwr[1] then
+					t[v] = { pwr[1].cost, pwr[1].type }
+					return t[v]
+				else
+					t[v] = { pwr.cost, pwr.type }
+					return t[v]
+				end 
 			end     
 			return t.null
 		end,
@@ -359,7 +377,10 @@ A.GetSpellDescription = A.MakeFunctionCachedDynamic(A.GetSpellDescription)
 
 function A:GetSpellCastTime()
 	-- @return number 
-	local _,_,_, castTime = GetSpellInfo(self.ID)
+	local spellName, _, _, castTime = GetSpellInfo(self.ID)
+	if type(spellName) == "table" then 
+		castTime = spellName.castTime
+	end 
 	return (castTime or 0) / 1000 
 end 
 
@@ -375,9 +396,11 @@ end
 
 function A:GetSpellCharges()
 	-- @return number
-	local charges = GetSpellCharges((self:Info()))
+	local charges = GetSpellCharges(self.ID)
 	if not charges then 
 		charges = 0
+	elseif type(charges) == "table" then 
+		charges = charges.currentCharges
 	end 
 	
 	return charges
@@ -385,7 +408,11 @@ end
 
 function A:GetSpellChargesMax()
 	-- @return number
-	local _, max_charges = GetSpellCharges((self:Info()))
+	local charges, max_charges = GetSpellCharges(self.ID)
+	if type(charges) == "table" then 
+		max_charges = charges.maxCharges
+	end  
+	
 	if not max_charges then 
 		max_charges = 0
 	end 
@@ -395,7 +422,14 @@ end
 
 function A:GetSpellChargesFrac()
 	-- @return number	
-	local charges, maxCharges, start, duration = GetSpellCharges((self:Info()))
+	local charges, maxCharges, start, duration = GetSpellCharges(self.ID)
+	if type(charges) == "table" then 		
+		maxCharges = charges.maxCharges
+		start = charges.cooldownStartTime
+		duration = charges.cooldownDuration
+		charges = charges.currentCharges
+	end  
+	
 	if not maxCharges then 
 		return 0
 	end 
@@ -409,7 +443,11 @@ end
 
 function A:GetSpellChargesFullRechargeTime()
 	-- @return number
-	local _, _, _, duration = GetSpellCharges((self:Info()))
+	local charges, _, _, duration = GetSpellCharges(self.ID)
+	if type(charges) == "table" then 
+		duration = charges.cooldownDuration
+	end  
+	
 	if duration then 
 		return (self:GetSpellChargesMax() - self:GetSpellChargesFrac()) * duration
 	else 
@@ -552,9 +590,23 @@ end
 -------------------------------------------------------------------------------
 -- Spell Rank 
 -------------------------------------------------------------------------------
-local DataSpellRanks = {}
-local DataIsSpellUnknown = {}
-function A.UpdateSpellBook(isProfileLoad)
+local function AreTablesEqual(t1, t2)
+	for k, v in pairs(t1) do if t2[k] ~= v then return false end end	
+	for k, v in pairs(t2) do if t1[k] ~= v then return false end end	
+	return true
+end
+
+local function MirrorTables(t1, t2)
+	wipe(t2)
+	for k, v in pairs(t1) do
+		t2[k] = v
+	end
+end
+
+local DataSpellRanks, DataSpellRanksMirror = {}, {}
+local DataIsSpellUnknown, DataIsSpellUnknownMirror = {}, {}
+local timeSinceLastUpdate = TMW.time or 0
+function A.UpdateSpellBook(IsLoadingProfileOrPetUPDOWN)
 	local ShowAllSpellRanks = GetCVar("ShowAllSpellRanks") or "1"
 	SetCVar("ShowAllSpellRanks", "1")
 	
@@ -664,26 +716,32 @@ function A.UpdateSpellBook(isProfileLoad)
 		end 
 	end 
 	
-	if isProfileLoad ~= true then 
-		TMW:Fire("TMW_ACTION_SPELL_BOOK_CHANGED")	  -- for [3] tab refresh 
-		--TMW:Fire("TMW_ACTION_RANK_DISPLAY_CHANGED") -- no need here since :Show method will be triggered 
+	-- This part of code avoids reconfigure load on Meta Engine
+	-- Because TRAINER_UPDATE called the callback even when there were no actual changes
+	if not AreTablesEqual(DataSpellRanks, DataSpellRanksMirror) or not AreTablesEqual(DataIsSpellUnknown, DataIsSpellUnknownMirror) then
+		MirrorTables(DataSpellRanks, DataSpellRanksMirror)
+		MirrorTables(DataIsSpellUnknown, DataIsSpellUnknownMirror)
+		
+		TMW:Fire("TMW_ACTION_SPELL_BOOK_CHANGED")	  		-- for [3] tab refresh 
+	  --TMW:Fire("TMW_ACTION_RANK_DISPLAY_CHANGED") 		-- no need here since :Show method will be triggered 
+	
+		if IsLoadingProfileOrPetUPDOWN ~= true and TMW.time > timeSinceLastUpdate + 1 then
+			TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")	-- only fired on new or updated spells
+			timeSinceLastUpdate = TMW.time
+		end
 	end 
 	
 	SetCVar("ShowAllSpellRanks", ShowAllSpellRanks)
-	TMW:Fire("TMW_ACTION_METAENGINE_RECONFIGURE")
 end 
 
 -- "LEARNED_SPELL_IN_TAB" > "TRAINER_UPDATE" > "SKILL_LINES_CHANGED"
 -- "LEARNED_SPELL_IN_TAB" new added
--- "SKILL_LINES_CHANGED" new added / existing level (rank) update
+-- "SKILL_LINES_CHANGED" new added / existing level (rank) update, replaced to "TRAINER_UPDATE" because of lag spikes on MetaEngine
 Listener:Add("ACTION_EVENT_SPELL_RANKS", "LEARNED_SPELL_IN_TAB", 		A.UpdateSpellBook)
-Listener:Add("ACTION_EVENT_SPELL_RANKS", "SKILL_LINES_CHANGED", 		A.UpdateSpellBook) 
-TMW:RegisterCallback("TMW_ACTION_TALENT_MAP_UPDATED", function()
-	A.UpdateSpellBook()
-end)
-TMW:RegisterCallback("TMW_ACTION_PET_LIBRARY_MAIN_PET_UP", function()
-	A.UpdateSpellBook()
-end)
+Listener:Add("ACTION_EVENT_SPELL_RANKS", "TRAINER_UPDATE", 				A.UpdateSpellBook) 
+TMW:RegisterCallback("TMW_ACTION_TALENT_MAP_UPDATED", 					A.UpdateSpellBook)
+TMW:RegisterCallback("TMW_ACTION_PET_LIBRARY_MAIN_PET_UP", function()	A.UpdateSpellBook(true) end)
+TMW:RegisterCallback("TMW_ACTION_PET_LIBRARY_MAIN_PET_DOWN", function()	A.UpdateSpellBook(true) end)
 
 function A:IsBlockedBySpellBook()
 	-- @return boolean 
@@ -712,13 +770,11 @@ end
 function A:GetTalentRank()
 	-- @usage A:GetTalentRank() or A.GetTalentRank(spellID)
 	-- @return number 
-	local ID, Name
-	if type(self) == "table" then 
-		--ID = self.ID 
+	local Name
+	if type(self) == "table" then
 		Name = self:Info()
 	else 
-		ID = self 
-		Name = A_GetSpellInfo(ID)
+		Name = A_GetSpellInfo(self)
 	end	
 	return TalentMap[Name] or 0 
 end 
@@ -726,15 +782,13 @@ end
 function A:IsTalentLearned()
 	-- @usage A:IsTalentLearned() or A.IsTalentLearned(spellID)
 	-- @return boolean 
-	local ID, Name
+	local Name
 	if type(self) == "table" then 
-		ID = self.ID 
 		Name = self:Info()
 	else 
-		ID = self 
-		Name = A_GetSpellInfo(ID)
+		Name = A_GetSpellInfo(self)
 	end	
-	return TalentMap[Name] and TalentMap[Name] > 0 or false 
+	return TalentMap[Name] and TalentMap[Name] > 0
 end
 
 -- Remap to keep old code working for it 
@@ -745,24 +799,6 @@ A.IsSpellLearned = A.IsTalentLearned
 -- Racial (template)
 -------------------------------------------------------------------------------	 
 local Racial = {
-	GetRaceBySpellName 										= {
-		-- Perception 
-		[Spell:CreateFromSpellID(20600):GetSpellName()] 	= "Human",
-		-- Shadowmeld
-		[Spell:CreateFromSpellID(20580):GetSpellName()] 	= "NightElf",
-		-- EscapeArtist
-		[Spell:CreateFromSpellID(20589):GetSpellName()] 	= "Gnome",
-		-- Stoneform
-		[Spell:CreateFromSpellID(20594):GetSpellName()] 	= "Dwarf",
-		-- WilloftheForsaken
-		[Spell:CreateFromSpellID(7744):GetSpellName()] 		= "Scourge", 				-- (this is confirmed) Undead 
-		-- Berserking
-		[Spell:CreateFromSpellID(20554):GetSpellName()] 	= "Troll",
-		-- WarStomp
-		[Spell:CreateFromSpellID(20549):GetSpellName()] 	= "Tauren",
-		-- BloodFury
-		[Spell:CreateFromSpellID(20572):GetSpellName()] 	= "Orc",
-	},
 	Temp													= {
 		TotalAndMagic 										= {"TotalImun", "DamageMagicImun"},
 		TotalAndPhysAndCC									= {"TotalImun", "DamagePhysImun", "CCTotalImun"},
@@ -824,7 +860,7 @@ local Racial = {
 							not unitID or 
 							not Unit(unitID):IsEnemy() 
 						) and 
-						MultiUnits:GetCasting(8, 1) >= 1
+						MultiUnits:GetByRangeCasting(8, 1) >= 1
 					)			  
 		end 		
 
@@ -855,6 +891,84 @@ local Racial = {
 		return true 		
 	end, 
 }
+if BuildToC >= 40000 then
+	-- CATA+ (valid for MOP)
+	Racial.GetRaceBySpellName = {
+		-- Perception 
+		[Spell:CreateFromSpellID(59752):GetSpellName()] 	= "Human",
+		-- Shadowmeld
+		[Spell:CreateFromSpellID(58984):GetSpellName()] 	= "NightElf",
+		-- EscapeArtist
+		[Spell:CreateFromSpellID(20589):GetSpellName()] 	= "Gnome",
+		-- Stoneform
+		[Spell:CreateFromSpellID(20594):GetSpellName()] 	= "Dwarf",
+		-- WilloftheForsaken
+		[Spell:CreateFromSpellID(7744):GetSpellName()] 		= "Scourge", 				-- (this is confirmed) Undead 
+		-- Berserking
+		[Spell:CreateFromSpellID(26297):GetSpellName()] 	= "Troll",
+		-- WarStomp
+		[Spell:CreateFromSpellID(20549):GetSpellName()] 	= "Tauren",
+		-- BloodFury
+		[Spell:CreateFromSpellID(20572):GetSpellName()] 	= "Orc",
+	}
+elseif BuildToC >= 30000 then
+	Racial.GetRaceBySpellName = {
+		-- Perception 
+		[Spell:CreateFromSpellID(20600):GetSpellName()] 	= "Human",
+		-- Shadowmeld
+		[Spell:CreateFromSpellID(58984):GetSpellName()] 	= "NightElf",
+		-- EscapeArtist
+		[Spell:CreateFromSpellID(20589):GetSpellName()] 	= "Gnome",
+		-- Stoneform
+		[Spell:CreateFromSpellID(20594):GetSpellName()] 	= "Dwarf",
+		-- WilloftheForsaken
+		[Spell:CreateFromSpellID(7744):GetSpellName()] 		= "Scourge", 				-- (this is confirmed) Undead 
+		-- Berserking
+		[Spell:CreateFromSpellID(26297):GetSpellName()] 	= "Troll",
+		-- WarStomp
+		[Spell:CreateFromSpellID(20549):GetSpellName()] 	= "Tauren",
+		-- BloodFury
+		[Spell:CreateFromSpellID(20572):GetSpellName()] 	= "Orc",
+	}
+elseif BuildToC >= 20000 then
+	Racial.GetRaceBySpellName = {
+		-- Perception 
+		[Spell:CreateFromSpellID(20600):GetSpellName()] 	= "Human",
+		-- Shadowmeld
+		[Spell:CreateFromSpellID(20580):GetSpellName()] 	= "NightElf",
+		-- EscapeArtist
+		[Spell:CreateFromSpellID(20589):GetSpellName()] 	= "Gnome",
+		-- Stoneform
+		[Spell:CreateFromSpellID(20594):GetSpellName()] 	= "Dwarf",
+		-- WilloftheForsaken
+		[Spell:CreateFromSpellID(7744):GetSpellName()] 		= "Scourge", 				-- (this is confirmed) Undead 
+		-- Berserking
+		[Spell:CreateFromSpellID(20554):GetSpellName()] 	= "Troll",
+		-- WarStomp
+		[Spell:CreateFromSpellID(20549):GetSpellName()] 	= "Tauren",
+		-- BloodFury
+		[Spell:CreateFromSpellID(20572):GetSpellName()] 	= "Orc",
+	}
+else
+	Racial.GetRaceBySpellName = {
+		-- Perception 
+		[Spell:CreateFromSpellID(20600):GetSpellName()] 	= "Human",
+		-- Shadowmeld
+		[Spell:CreateFromSpellID(20580):GetSpellName()] 	= "NightElf",
+		-- EscapeArtist
+		[Spell:CreateFromSpellID(20589):GetSpellName()] 	= "Gnome",
+		-- Stoneform
+		[Spell:CreateFromSpellID(20594):GetSpellName()] 	= "Dwarf",
+		-- WilloftheForsaken
+		[Spell:CreateFromSpellID(7744):GetSpellName()] 		= "Scourge", 				-- (this is confirmed) Undead 
+		-- Berserking
+		[Spell:CreateFromSpellID(20554):GetSpellName()] 	= "Troll",
+		-- WarStomp
+		[Spell:CreateFromSpellID(20549):GetSpellName()] 	= "Tauren",
+		-- BloodFury
+		[Spell:CreateFromSpellID(20572):GetSpellName()] 	= "Orc",
+	}
+end
 
 function A:IsRacialReady(unitID, skipRange, skipLua, skipShouldStop)
 	-- @return boolean 
@@ -904,8 +1018,15 @@ end
 
 function A:GetItemCooldown()
 	-- @return number
+	
+	-- Potion Sickness
+	-- Unable to consume potions until you rest out of combat for a short duration.
+	if self.Type == "Potion" and Unit("player"):HasBuffs(53787) > 0 then 
+		return huge
+	end 
+	
 	local start, duration, enable = self.Item:GetCooldown()
-	return enable ~= 0 and ((duration == 0 or A_OnGCD(duration)) and 0 or duration - (TMW.time - start)) or huge
+	return (enable == 1 or enable == true) and duration and ((duration == 0 or A_OnGCD(duration)) and 0 or duration - (TMW.time - start)) or huge
 end 
 
 function A:GetItemCategory()
@@ -949,7 +1070,11 @@ function A:IsExists(replacementByPass)
 	-- @return boolean
 	if self.Type == "Spell" then 
 		-- DON'T USE HERE A.GetSpellInfo COZ IT'S CACHE WHICH WILL WORK WRONG DUE RACE CHANGES
-		local spellName, _, _, _, _, _, spellID = GetSpellInfo((self:Info())) 
+		local spellName, _, _, _, _, _, spellID = GetSpellInfo((self:Info()) or "") 
+		if type(spellName) == "table" then 
+			spellID = spellName.spellID
+			spellName = spellName.name
+		end 
 		-- spellID will be nil in case of if it's not a player's spell 
 		-- spellName will not be equal to self:Info() if it's replacement spell like "Chi-Torpedo" and "Roll"
 		return (not replacementByPass or spellName == self:Info()) and type(spellID) == "number" and (IsPlayerSpell(spellID) or (Pet:IsActive() and Pet:IsSpellKnown(spellID)) or FindSpellBookSlotBySpellID(spellID, false))
@@ -968,7 +1093,7 @@ function A:IsUsable(extraCD, skipUsable)
 	-- Note: Seems Classic versions handles wrong spellName for some reasons.. we have to use specified ID instead of name
 	
 	if self.Type == "Spell" then 
-		-- Works for pet spells 01/04/2019		
+		-- Works for pet spells 01/04/2019
 		return (skipUsable == true or (type(skipUsable) == "number" and Unit("player"):Power() >= skipUsable) or IsUsableSpell(self.ID)) and self:GetCooldown() <= A_GetPing() + CACHE_DEFAULT_TIMER + (self:IsRequiredGCD() and A_GetCurrentGCD() or 0) + (extraCD or 0)
 	end 
 	
@@ -978,7 +1103,7 @@ end
 function A:IsHarmful()
 	-- @return boolean 
 	if self.Type == "Spell" then 
-		return IsHarmfulSpell((self:Info())) or IsAttackSpell((self:Info()))
+		return IsHarmfulSpell(self.ID) or IsAttackSpell(self.ID)
 	end 
 	
 	return IsHarmfulItem((self:Info()))
@@ -987,7 +1112,7 @@ end
 function A:IsHelpful()
 	-- @return boolean 
 	if self.Type == "Spell" then 
-		return IsHelpfulSpell((self:Info()))
+		return IsHelpfulSpell(self.ID)
 	end 
 	
 	return IsHelpfulItem((self:Info()))
@@ -1088,6 +1213,12 @@ function A:AbsentImun(unitID, imunBuffs)
 			local debuffName, expirationTime, remainTime, _
 			for i = 1, huge do			
 				debuffName, _, _, _, _, expirationTime = UnitAura(unitID, i, "HARMFUL")
+				
+				if type(debuffName) == "table" then 
+					expirationTime = debuffName.expirationTime
+					debuffName = debuffName.name
+				end  				
+				
 				if not debuffName then
 					break 
 				elseif IsBreakAbleDeBuff[debuffName] then 
@@ -1099,8 +1230,18 @@ function A:AbsentImun(unitID, imunBuffs)
 			end ]]
 		end 
 		
-		if isEnemy and imunBuffs and A.IsInPvP and Unit(unitID):IsPlayer() and Unit(unitID):HasBuffs(imunBuffs) > MinDur then 
-			return false 
+		if isEnemy and imunBuffs and A.IsInPvP and Unit(unitID):IsPlayer() then 
+			if Unit(unitID):HasBuffs(imunBuffs) > MinDur then 
+				return false 
+			end 
+			
+			-- Classic: Failsafe Phylactery
+			if BuildToC < 20000 then
+				local FailsafePhylactery = Unit(unitID):HasBuffs(370391)
+				if FailsafePhylactery > 0 and Unit(unitID):TimeToDie() <= FailsafePhylactery then 
+					return false 
+				end 
+			end
 		end 
 
 		return true
@@ -1225,7 +1366,7 @@ function A.DetermineHealObject(unitID, skipRange, skipLua, skipShouldStop, skipU
 	local unitGUID = UnitGUID(unitID)
 	for i = 1, select("#", ...) do 
 		local object = select(i, ...)
-		if object:IsReady(unitID, skipRange, skipLua, skipShouldStop, skipUsable) and object:PredictHeal(unitID, object:GetSpellCastTimeCache() ~= 0 and A.GetSpellCastTimeCache(A.LastPlayerCastName) ~= 0 and CombatTracker:GetSpellLastCast("player", A.LastPlayerCastName) < 0.5 and 2 or nil, unitGUID) then -- Only Classic has a bit delay like 'flying' spells before heal up some amount after cast			
+		if object and object:IsReady(unitID, skipRange, skipLua, skipShouldStop, skipUsable) and object:PredictHeal(unitID, object:GetSpellCastTimeCache() ~= 0 and A.GetSpellCastTimeCache(A.LastPlayerCastName) ~= 0 and CombatTracker:GetSpellLastCast("player", A.LastPlayerCastName) < 0.5 and 2 or nil, unitGUID) then -- Only Classic has a bit delay like 'flying' spells before heal up some amount after cast			
 			return object
 		end 
 	end 
@@ -1235,7 +1376,7 @@ function A.DetermineUsableObject(unitID, skipRange, skipLua, skipShouldStop, ski
 	-- @return object or nil 
 	for i = 1, select("#", ...) do 
 		local object = select(i, ...)
-		if object:IsReady(unitID, skipRange, skipLua, skipShouldStop, skipUsable) then 
+		if object and object:IsReady(unitID, skipRange, skipLua, skipShouldStop, skipUsable) then 
 			return object
 		end 
 	end 
@@ -1245,7 +1386,7 @@ function A.DetermineIsCurrentObject(...)
 	-- @return object or nil 
 	for i = 1, select("#", ...) do 
 		local object = select(i, ...)
-		if object:IsCurrent() then 
+		if object and object:IsCurrent() then 
 			return object
 		end 
 	end 
@@ -1256,7 +1397,7 @@ function A.DetermineCountGCDs(...)
 	local count = 0
 	for i = 1, select("#", ...) do 
 		local object = select(i, ...)		
-		if (not object.isStance or A.PlayerClass ~= "WARRIOR") and object:IsRequiredGCD() and not object:IsBlocked() and not object:IsBlockedBySpellBook() and (not object.isTalent or object:IsTalentLearned()) and object:GetCooldown() <= A_GetPing() + CACHE_DEFAULT_TIMER + A_GetCurrentGCD() then 
+		if object and (not object.isStance or A.PlayerClass ~= "WARRIOR") and object:IsRequiredGCD() and not object:IsBlocked() and not object:IsBlockedBySpellBook() and (not object.isTalent or object:IsTalentLearned()) and object:GetCooldown() <= A_GetPing() + CACHE_DEFAULT_TIMER + A_GetCurrentGCD() then 
 			count = count + 1
 		end 
 	end 	
@@ -1324,8 +1465,19 @@ end
 
 -- Spell  
 local spellinfocache = setmetatable({}, { __index = function(t, v)
-    local a = { GetSpellInfo(v) }
-	t[v] = a
+    local a
+	if C_Spell and C_Spell.GetSpellInfo then 
+		local s = GetSpellInfo(v)
+		if s then 
+			a = { s.name, s.rank, s.iconID, s.castTime, s.minRange, s.maxRange, s.spellID, s.originalIconID }
+		else 
+			a = { }
+		end 
+	else 
+		a = { GetSpellInfo(v) }
+	end 
+	
+    t[v] = a
     return a
 end })
 
@@ -1430,6 +1582,39 @@ function A:GetColoredSwapTexture(custom)
 end 
 
 -------------------------------------------------------------------------------
+-- Cache Manager
+-------------------------------------------------------------------------------
+do 
+	if BuildToC >= 100000 then 
+		local function WipeCache()
+			wipe(TMW.GetSpellTexture)
+			
+			wipe(spellbasecache)	
+			wipe(spellinfocache)
+			
+			wipe(spellpowercache)
+			wipe(descriptioncache)
+			
+			wipe(itemspellcache)
+			wipe(iteminfocache)		
+			
+			-- Update Actions tab in UI if AutoHidden is enabled
+			TMW:Fire("TMW_ACTION_SPELL_BOOK_CHANGED")
+		end 
+
+		-- Post-Init 
+		TMW:RegisterSelfDestructingCallback("TMW_ACTION_IS_INITIALIZED", function()
+			--Listener:Add("ACTION_EVENT_ACTIONS", "SPELLS_CHANGED", WipeCache) -- commented because it wipes cache in combat which we don't want to 
+			Listener:Add("ACTION_EVENT_ACTIONS", "PLAYER_TALENT_UPDATE", WipeCache)
+			Listener:Add("ACTION_EVENT_ACTIONS", "ACTIVE_TALENT_GROUP_CHANGED", WipeCache)
+			TMW:RegisterCallback("TMW_ACTION_PLAYER_SPECIALIZATION_CHANGED", WipeCache)
+			TMW:RegisterCallback("TMW_ACTION_MODE_CHANGED", WipeCache)
+			return true -- Signal RegisterSelfDestructingCallback to unregister
+		end)
+	end 
+end 
+
+-------------------------------------------------------------------------------
 -- UI: Create
 -------------------------------------------------------------------------------
 -- Receive information from server about items before start UI builder
@@ -1456,8 +1641,8 @@ TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED", function()
 					err = (err or "Script found duplicate .TableKeyIdentify:\n") .. key .. " = " .. TableKeys[action:GetTableKeyIdentify()] .. ". Output: " .. action.TableKeyIdentify .. "\n"
 				else 
 					TableKeys[action:GetTableKeyIdentify()] = key 
-				end 	
-					
+				end 
+
 				if action.Macro and #action.Macro > 255 then
 					err = (err or "") .. key .. " macro exceeds 255 bytes (" .. #action.Macro .. " current bytes)\n"
 				end
@@ -1482,6 +1667,7 @@ function A.Create(args)
 	 	Optional:			
 			Desc (@string) 					- description used in A:GetTableKeyIdentify and in UI in the Actions tab in Desc ceil 
 			Hidden (@boolean) 				- hides action from UI and skips it in MetaEngine
+			HiddenUI (@boolean)				- hides action from UI only, if both Hidden and HiddenUI are set then Hidden will take over priority
 			QueueForbidden (@boolean) 		- if true, user will not be able to set queue on it
 			BlockForbidden (@boolean)		- if true, user will not be able to set blocker on it
 			Texture (@number) 				- only if Type is Spell|Item|Potion|Trinket|HeartOfAzeroth|SwapEquip, sets texture from Spell|Item data base
@@ -1505,6 +1691,7 @@ function A.Create(args)
 		All settings below are processed during initialization. Actions are skipped if they have Hidden = true or if MetaEngine is not available.
 		Each created action can be used in one of the following ways:
 			1) Action:ExecuteScript() method:
+					This method doesn't have mechanism for re-calling within same single iteration. Alternatively, for re-calling you can use it via TMW:Fire("TMW_ACTION_METAENGINE_UPDATE", "Script", A.ScriptObj) instead of A.ScriptObj:ExecuteScript()
 				@required
 					Type = "Script"
 					Script (@string) wraps script in restricted env, can be used in-combat. Built-in variables:
@@ -1564,12 +1751,12 @@ function A.Create(args)
 			MetaEngine has own taint paths, attempting to penetrate it will not only disable MetaEngine, but also may uninstall it.
 			MetaEngine by default works inside of A[1]-A[10] functions and HealingEngine, although through callback it can be used anywhere as long as actions are created.
 			
-			Calling same action will not be performed twice until it will be rotated. Repeatedly call ExecuteScript is not possible within same iteration.
+			Calling same action will not be performed twice until it will be rotated unless Type is Script. Repeatedly call ExecuteScript is not possible within same iteration.
 			The main purpose of using Script is to update toggles and perform other buttons to inherit its attributes and pass them to the active meta-button but that will work as long as nothing else override it, for example:
 				Refs = { ["ToT"] = _G.ToT }
 				Script = 'local ToTMacro = self:GetFrameRef("ToT"):GetAttributes("macrotext"); this3:SetAttribute("macrotext", ToTMacro); this3:SetAttribute("macroactive", ToTMacro)'
 			That's it, you just connected the usual API to the MetaEngine for the 3rd active meta-button. "macroactive" is used to maintain the macrotext of ToTMacro in "macrotext" of meta-button when chained.
-			Alternatively, you can just set Macro to click your button:
+			Alternatively, you can just set Macro to click your button if it's not set up as macro:
 				Macro = "/click ".._G.ToT:GetName()
 			
 			All General and HealingEngine actions are pre-allocated:
@@ -1577,6 +1764,9 @@ function A.Create(args)
 			/focus  arena1-5, party1-4, player, partypet1-4, raid1-40, raidpet1-40
 			/use 13, 14, any Healthstone, any HealingPotion (see Core.lua)
 			/stopcasting, /targetenemy, /targetlasttarget, /startattack, /stopattack
+			
+			These actions are undefined and should be used through texture argument as non action-object:
+			A:Show(icon, ACTION_CONST_STOPCAST) resolves /stopcasting
 			
 			
 			Structure and construction:
@@ -1602,7 +1792,7 @@ function A.Create(args)
 				• [7]  Active meta-button 			this7,  this7click  		"AntiFake CC Focus"				@owner if action.IsAntiFake, autounit resolves unit to focus
 				• [8]  Active meta-button 			this8,  this8click  		"AntiFake Interrupt Focus"		@owner if action.IsAntiFake, autounit resolves unit to focus
 				• [9]  Active meta-button 			this9,  this9click  		"AntiFake CC2"					@owner if action.IsAntiFake, autounit resolves unit to mouseover (harm) and target
-				• [10] Active meta-button 			this10, this10click 		"AntiFake CC2 Focus2"			@owner if action.IsAntiFake, autounit resolves unit to focus
+				• [10] Active meta-button 			this10, this10click 		"AntiFake CC2 Focus"			@owner if action.IsAntiFake, autounit resolves unit to focus
 					Attributes						
 						this%slot%: 
 							"pressAndHoldAction", true
@@ -1727,7 +1917,13 @@ function A.Create(args)
 				A.Unit1Spell.Macro = nil
 				A.Unit1Spell.Click = nil
 				just do nothing, as mentioned before, such keys will be auto generated, although they cannot automatically determine when action should be used as /cast [@player] or [@cursor] or /castsequence, therefore, they need to be defined manually
-				
+			Moreover, due to specifics of macro implementation, default macro will never behave same as macro used in this engine. This is because macro used in this engine only performs one action per event, typically the first successful line from top to bottom in macro that is available for performing action.
+			Good example of this behavior can be illustrated by following example:
+				/stopcasting
+				/cast Battle Shout
+			The first line, where /stopcasting is used, will only be used without triggering other lines when you're channeling or casting. Otherwise, if you don't channel or cast, the second line will be executed to cast Battle Shout, since the first line can no longer perform its action.
+			So, the first click will trigger /stopcasting when you're channeling or casting, and the second click will trigger /cast Battle Shout because you're longer channeling and casting.
+			
 
 		Functions
 			function Action.MetaEngine:GetErrorCodes()
@@ -2028,7 +2224,7 @@ function A.Create(args)
 		-- MetaEngine
 		action:SetDefaultAction()
 		
-		return action
+		return action	
 	end 
 	
 	-- Type "Script" (MetaEngine)

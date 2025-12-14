@@ -11,7 +11,7 @@ local math_floor				= math.floor
 local math_max					= math.max
 local strbyte					= _G.strbyte
 local strchar					= _G.strchar
-local message					= _G.message
+local message					= _G.message or _G.SetBasicMessageDialogText
 local wipe						= _G.wipe
 local hooksecurefunc			= _G.hooksecurefunc
 
@@ -20,23 +20,19 @@ local A 						= _G.Action
 local CONST 					= A.Const
 local ActionTimers 				= A.Data.T
 local GetToggle					= A.GetToggle
+local GetMouseFocus				= A.GetMouseFocus
+local BuildToC 					= A.BuildToC
 	  
-local Timer						= _G.C_Timer 
-local GetMouseFocus				= _G.GetMouseFocus
-local IsAddOnLoaded 			= _G.IsAddOnLoaded
+local Timer						= _G.C_Timer
+local C_AddOns					= _G.C_AddOns
+local GetNumAddOns	 			= C_AddOns and C_AddOns.GetNumAddOns or _G.GetNumAddOns
+local IsAddOnLoaded 			= C_AddOns and C_AddOns.IsAddOnLoaded or _G.IsAddOnLoaded
+local GetAddOnInfo 				= C_AddOns and C_AddOns.GetAddOnInfo or _G.GetAddOnInfo
 
 local CreateFrame 				= _G.CreateFrame
 local UnitGUID 					= _G.UnitGUID
-
-local 	 GetNumTalentTabs, 	  GetNumTalents, 	GetTalentInfo =
-	  _G.GetNumTalentTabs, _G.GetNumTalents, _G.GetTalentInfo
 	  
 local CACHE_DEFAULT_TIMER		= CONST.CACHE_DEFAULT_TIMER	  
-
-if type(message) ~= "function" then 
-	_G.message 	= print 
-	message		= print 
-end 
 
 -------------------------------------------------------------------------------
 -- Listener
@@ -391,28 +387,6 @@ hooksecurefunc(A, "GetLocalization", function()
 end)
 
 -------------------------------------------------------------------------------
--- TalentMap  
--------------------------------------------------------------------------------
-A.TalentMap = {}
-local function TalentMap()
-	wipe(A.TalentMap)
-	for tab = 1, GetNumTalentTabs() do
-		for talent = 1, GetNumTalents(tab) do
-			local name, _, _, _, rank = GetTalentInfo(tab, talent)
-			if name then
-				A.TalentMap[name] = rank or 0
-			end
-		end
-	end
-	TMW:Fire("TMW_ACTION_TALENT_MAP_UPDATED")
-end
-
-A.Listener:Add("ACTION_EVENT_TOOLS", "PLAYER_ENTERING_WORLD", 		TalentMap)
---A.Listener:Add("ACTION_EVENT_TOOLS", "LEARNED_SPELL_IN_TAB", 		TalentMap)
---A.Listener:Add("ACTION_EVENT_TOOLS", "CONFIRM_TALENT_WIPE", 		TalentMap)
-A.Listener:Add("ACTION_EVENT_TOOLS", "CHARACTER_POINTS_CHANGED", 	TalentMap)
-
--------------------------------------------------------------------------------
 -- Timers 
 -------------------------------------------------------------------------------
 -- @usage /run Action.TimerSet("Print", 4, function() Action.Print("Hello") end)
@@ -609,7 +583,7 @@ A.Utils 						= Utils
 function A.MouseHasFrame()
     local focus = A_Unit("mouseover"):IsExists() and GetMouseFocus()
     if focus then
-        local frame = not focus:IsForbidden() and focus:GetName()
+		local frame = (not focus.IsForbidden or not focus:IsForbidden()) and focus.GetName and focus:GetName()
         return not frame or (frame and frame ~= "WorldFrame")
     end
     return false
@@ -633,17 +607,28 @@ end
 -------------------------------------------------------------------------------
 -- Errors
 -------------------------------------------------------------------------------
-local listDisable, toDisable = { "ButtonFacade", "Masque", "Masque_ElvUIesque", "GSE", "Gnome Sequencer Enhanced", "Gnome Sequencer", "AddOnSkins" }
-A.Listener:Add("ACTION_EVENT_TOOLS", "PLAYER_LOGIN", function()	
-	for i = 1, #listDisable do    
-		if IsAddOnLoaded(listDisable[i]) then
-			toDisable = (toDisable or "\n") .. listDisable[i] .. "\n"
+local function AddonsCheck()	
+	if not GetToggle(1, "DisableAddonsCheck") then 
+		local pattern = { "ButtonFacade", "Masque", "GSE", "Gnome Sequencer", "AddOnSkins" }
+		local entries, addonName = {}
+		for i = 1, GetNumAddOns() do    
+			if IsAddOnLoaded(i) then
+				addonName = GetAddOnInfo(i)
+				for i = 1, #pattern do 
+					-- For simple literal matching, find is marginally faster
+					-- because it returns indices without allocating new substring
+					if addonName:find(pattern[i]) then 
+						entries[#entries + 1] = addonName
+					end 
+				end 
+			end
+		end
+
+		if #entries > 0 then 
+			message("Disable next addons:\n" .. concat(entries, ", "))
 		end
 	end
 
-	if toDisable then 
-		message("Disable next addons:" .. toDisable)
-	end
-
-	A.Listener:Remove("ACTION_EVENT_TOOLS", "PLAYER_LOGIN")
-end)
+	TMW:UnregisterCallback("TMW_ACTION_IS_INITIALIZED", AddonsCheck, "TMW_ACTION_ADDONSCHECK_IS_INITIALIZED")
+end
+TMW:RegisterCallback("TMW_ACTION_IS_INITIALIZED", AddonsCheck, "TMW_ACTION_ADDONSCHECK_IS_INITIALIZED") 

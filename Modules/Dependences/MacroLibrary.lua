@@ -22,16 +22,15 @@ TMW:RegisterCallback("TMW_ACTION_MACRO_LIBRARY_UPDATED", function(callbackEvent)
 	print("Macro created, deleted or changed")
 end)
 ]]
-
 local _G, type, unpack, pairs, next, select	=
 	  _G, type, unpack, pairs, next, select	
-
+	  
 local TMW								= _G.TMW
 local A 								= _G.Action
 local CONST 							= A.Const
 local Listener							= A.Listener
 local Print								= A.Print
-local Lib 								= LibStub:NewLibrary("MacroLibrary", 4)
+local Lib 								= LibStub:NewLibrary("MacroLibrary", 7)
 	  
 local wipe 								= _G.wipe	  
 local MAX_ACCOUNT_MACROS				= _G.MAX_ACCOUNT_MACROS
@@ -91,6 +90,7 @@ Lib.Data								= {
 	CharacterMacros						= {},
 	-- Pointers by critera to information tables (by ID) above
 	ByNameMacros						= {},
+	ByActionMacros						= {},
 }  	
 -- Holds information about action slots which stored a macro 
 Lib.ActionButtons						= {}
@@ -108,8 +108,13 @@ function Lib:CreateMacro(macroName, macroIcon, macroBody, perCharacter, isLocal)
 	return CreateMacro(macroName, macroIcon, macroBody, perCharacter, isLocal)
 end
 
+function Lib:GetAction(ID)
+	-- @return actionID or nil
+	return self:GetSpell(ID) or self:GetItem(ID)
+end
+
 function Lib:GetSpell(ID)
-	-- @return itemID or nil 
+	-- @return spellID or nil 
 	return GetMacroSpell(ID)
 end 
 
@@ -167,7 +172,7 @@ function Lib:SelectMacro(ID)
 		end 
 		
 		-- Select macro 	
-		MacroFrame_SelectMacro(ID)
+		MacroFrame_SelectMacro(ID, true)
 		
 		-- Refresh frame
 		MacroFrame_Update()
@@ -186,39 +191,53 @@ function Lib.UpdateMacros()
 	-- Note: Don't use 'self' here
 	Lib:WipeMacros()
 
-	local macroName, macroIcon, macroBody, lastIndex
+	local macroName, macroIcon, macroBody, lastIndex, actionID
 	-- Update Account Macros 
-	lastIndex 								 = 0
+	lastIndex 								 		= 0
 	for i = 1, MAX_ACCOUNT_MACROS do 		
-		macroName, macroIcon, macroBody 	 = GetMacroInfo(i) 		
+		macroName, macroIcon, macroBody 	 		= GetMacroInfo(i) 		
 		if not macroName then 			
 			break 
 		else 			
-			lastIndex						 = i
-			Lib.Data.AllMacros[i] 			 = { Name = macroName, Icon = macroIcon, Body = macroBody, ID = i }
-			Lib.Data.AllMacros[macroName]	 = Lib.Data.AllMacros[i]
-			Lib.Data.AccountMacros[i]		 = Lib.Data.AllMacros[i]
-			Lib.Data.ByNameMacros[macroName] = Lib.Data.AllMacros[i]
+			lastIndex						 		= i
+			actionID								= Lib:GetAction(i)
+			Lib.Data.AllMacros[i] 			 		= { Name = macroName, Icon = macroIcon, Body = macroBody, ID = i, Action = actionID }
+			Lib.Data.AllMacros[macroName]	 		= Lib.Data.AllMacros[i]			
+			Lib.Data.AccountMacros[i]		 		= Lib.Data.AllMacros[i]
+			Lib.Data.ByNameMacros[macroName] 		= Lib.Data.AllMacros[i]
+			if actionID then
+				if (type(actionID) == "number" and actionID > MAX_ACCOUNT_MACROS + MAX_CHARACTER_MACROS) or (type(actionID) == "string" and not Lib.Data.AllMacros[actionID]) then
+					Lib.Data.AllMacros[actionID]	= Lib.Data.AllMacros[i]
+				end
+				Lib.Data.ByActionMacros[actionID] 	= Lib.Data.AllMacros[i]
+			end
 		end 
 	end 
-	Lib.FreeAccountSlots 			 		 = MAX_ACCOUNT_MACROS - lastIndex
+	Lib.FreeAccountSlots 			 		 		= MAX_ACCOUNT_MACROS - lastIndex
 	
 	-- Update Character Macros 
-	lastIndex 								 = 0
+	lastIndex 								 		= 0
 	for i = 1, MAX_CHARACTER_MACROS do 
-		i 									 = MAX_ACCOUNT_MACROS + i 
-		macroName, macroIcon, macroBody 	 = GetMacroInfo(i) 
+		i 									 		= MAX_ACCOUNT_MACROS + i 
+		macroName, macroIcon, macroBody 	 		= GetMacroInfo(i) 
 		if not macroName then 
 			break 
 		else 
-			lastIndex						 = i - MAX_ACCOUNT_MACROS
-			Lib.Data.AllMacros[i] 			 = { Name = macroName, Icon = macroIcon, Body = macroBody, ID = i, perCharacter = true }
-			Lib.Data.AllMacros[macroName]	 = Lib.Data.AllMacros[i]
-			Lib.Data.CharacterMacros[i]		 = Lib.Data.AllMacros[i]
-			Lib.Data.ByNameMacros[macroName] = Lib.Data.AllMacros[i]
+			lastIndex						 		= i
+			actionID								= Lib:GetAction(i)
+			Lib.Data.AllMacros[i] 			 		= { Name = macroName, Icon = macroIcon, Body = macroBody, ID = i, Action = actionID }
+			Lib.Data.AllMacros[macroName]	 		= Lib.Data.AllMacros[i]			
+			Lib.Data.AccountMacros[i]		 		= Lib.Data.AllMacros[i]
+			Lib.Data.ByNameMacros[macroName] 		= Lib.Data.AllMacros[i]
+			if actionID then
+				if (type(actionID) == "number" and actionID > MAX_ACCOUNT_MACROS + MAX_CHARACTER_MACROS) or (type(actionID) == "string" and not Lib.Data.AllMacros[actionID]) then
+					Lib.Data.AllMacros[actionID]	= Lib.Data.AllMacros[i]
+				end
+				Lib.Data.ByActionMacros[actionID] 	= Lib.Data.AllMacros[i]
+			end
 		end 
 	end 
-	Lib.FreeCharacterSlots 				 	 = MAX_CHARACTER_MACROS - lastIndex
+	Lib.FreeCharacterSlots 				 	 		= MAX_CHARACTER_MACROS - lastIndex
 
 	TMW:Fire("TMW_ACTION_MACRO_LIBRARY_UPDATED")
 end 
@@ -369,9 +388,9 @@ end
 
 function Lib:GetIndexByActionButton(actionSlot)
 	-- @return @number or @nil
-	local actionType, macroID = GetActionInfo(actionSlot)
-	if actionType == "macro" and macroID ~= 0 then 
-		return macroID
+	local actionType, actionID = GetActionInfo(actionSlot)
+	if actionType == "macro" and actionID ~= 0 and self.Data.ByActionMacros[actionID] then 
+		return self.Data.ByActionMacros[actionID].ID
 	end
 end 
 
@@ -391,11 +410,12 @@ function Lib:GetActionButtons(ID)
 	end 
 end 
 
-function Lib:GetInfo(ID)
+function Lib:GetInfo(ID, By)
 	-- @return macroName, macroIcon, macroBody, macroID or nil 
 	-- Note: Instead of official GetMacroInfo the last return will be macroID
-	if ID and self.Data.AllMacros[ID] then 
-		return self.Data.AllMacros[ID].Name, self.Data.AllMacros[ID].Icon, self.Data.AllMacros[ID].Body, self.Data.AllMacros[ID].ID
+	local base = self.Data[By or "AllMacros"][ID]
+	if base then 
+		return base.Name, base.Icon, base.Body, base.ID
 	end 
 end 
 
@@ -429,7 +449,7 @@ function Lib:SetActionButton(ID, actionSlot)
 	-- @usage:
 	-- Lib:SetActionButton(@string or @number[, @number])
 	-- /dump LibStub("MacroLibrary"):SetActionButton(121, 1)
-	-- 1. ID is a index or name of then macro
+	-- 1. ID is a index or name of the macro
 	-- 2. actionSlot is number (0-120) or nil to use first available slot from the latest available bar
 	if (not InCombatLockdown() or issecure()) and self:IsExists(ID) then 
 		 PickupMacro(ID)
@@ -531,11 +551,11 @@ Listener:Add("ACTION_EVENT_MACRO_LIBRARY", "ADDON_LOADED", function(addonName)
 		GetLooseMacroItemIcons(Lib.Data.LooseItemsIcons)
 		GetMacroIcons(Lib.Data.Icons)
 		GetMacroItemIcons(Lib.Data.ItemIcons)
-		
+
 		MacroFrame_LoadUI()
-		MacroFrame_Update				= _G.MacroFrame_Update 		or function() 	Lib.MacroFrame:Update() 		end 
-		MacroFrame_SelectMacro			= _G.MacroFrame_SelectMacro or function(ID) Lib.MacroFrame:SelectMacro(ID) 	end 
-		MacroFrame_Show					= _G.MacroFrame_Show 		or function() 	Lib.MacroFrame:Show() 			end
+		MacroFrame_Update				= _G.MacroFrame_Update 		or function() 						Lib.MacroFrame:Update() 							end 
+		MacroFrame_SelectMacro			= _G.MacroFrame_SelectMacro or function(ID, scrollToSelected) 	Lib.MacroFrame:SelectMacro(ID, scrollToSelected) 	end 
+		MacroFrame_Show					= _G.MacroFrame_Show 		or function() 						Lib.MacroFrame:Show() 								end
 		Lib.MacroFrame 					= _G.MacroFrame
 		Lib.MacroFrameTab1				= _G.MacroFrameTab1
 		Lib.MacroFrameTab2				= _G.MacroFrameTab2

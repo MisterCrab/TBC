@@ -1,14 +1,14 @@
+--[[
 -------------------------------------------------------------------------------
 -- Introduction 
 -------------------------------------------------------------------------------
---[[
 If you plan to build profile without use lua then you can skip this guide
-]]
 
 -------------------------------------------------------------------------------
 -- №1: Create snippet 
 -------------------------------------------------------------------------------
--- Write in chat "/tmw options" > LUA Snippets > Profile (left side) > "+" > Write name of class in title of the snippet
+Write in chat "/tmw options" > LUA Snippets > Profile (left side) > "+" > Write name of class in title of the snippet
+--]]
 
 -------------------------------------------------------------------------------
 -- №2: Set profile defaults 
@@ -265,12 +265,10 @@ end
 --[[
 You're not limited to use snippets, their fixed names and any lua codes inside them (limit if they are more than 6k+ lines) 
 So you can even use HeroLib API actually (if it's available for Classic), that will be described in another documentation guide
-]]
 
 -------------------------------------------------------------------------------
 -- №4: Apply rotations on TellMeWhen
 -------------------------------------------------------------------------------
---[[
 If you use "[GGL] Basic" then you can skip it because it has already preconfigured it 
 
 For "Shown Main" group:
@@ -283,4 +281,4 @@ Rotation(thisobj)		 -- this is faster method than above since TMW lua has setfen
 5. Click and drag itself "Condition Icon" frame to "Shown Main" group and select from opened menu "Add to meta"
 6. Make sure if you moving "Condition Icon" #1 you additing it to "Meta Icon" #1 also in "Shown Main" 
 7. Do same for each "Condition Icon"
-]]
+--]]

@@ -1,3 +1,54 @@
+[Warrior v22]
+PiercingHowl								- Will not be used on solo target unless Hamstring can't be used
+PiercingHowl and Hamstring 					- Now they are checking Slowed debuffs instead of their own
+DemoralizingShout							- Will be used against Warrior and Paladin (Retribution, Protection) with higher priority
+WarStomp, ConcussionBlow, IntimidatingShout - Added as AntiFake Interrupt
+
+[Warrior v21]
+Fixed lua error "Unit.lua:3730: Unit.lua Action.Unit():.. was used with 'nil' unitID"
+
+[Warrior v20]
+OilofImmolation						- Fixed wrong Type
+Overpower							- Added isSpecial flag skipping unwanted rage checks in PvP on Evasion and Deterrence if Overpower-PWR-Below is set to Auto
+PiercingHowl						- Will be used after Overpower prior Rend in PvP
+ShieldBlock							- Will be used when any hunter targets us and we're not in melee + required enabled toggles: PvP-SwapEquip, PvP-DefensiveStance
+SunderArmor							- Added extra logic to refresh applied debuff
+Trick								- Added queue up Cleave on AoE and normal rotation code will replace Heroic Strike (if its queued) by Cleave if 2+ targets with other conditions
+Whirlwind							- Replaced range check from 8 yards by spell Hamstring (~5 yards) to avoid misses
+BattleShout							- Will not be instantly rebuffed
+SunderArmor							- Added checkbox to prioritize debuff stacking in PvE
+Intercept 							- Will ignore stun immuned buffs on Free Action Potion
+Rotation will stop if player is channeling
+Leveling Rotation fixed lua error when mouseover unit frames
+Optimized code for MetaEngine release
+Optimized code for 5-Unit system release
+
+[Warrior v19]
+HeroicStrike						- Updated tooltip description for Trick
+DemoralizingShout					- When fighting alongside other DPS Demoralizing Shout will be used regularly
+OilofImmolation						- Added in rotation with slider in PvE section of the Warrior tab
+AutoTarget							- Updated for range API changes, added switch condition if nearest unit is in combat
+
+[Warrior v18]
+Rend 								- On level rotation will be skipped on Undead and Mechanical creatures
+
+[Warrior v17]
+Fixed LightofElune wrong ID
+Fixed Overpower miss typo preventing it using on Deterrence and Evasion
+
+[Warrior v16]
+Fixed ENV error
+
+[Warrior v15]
+Added support for gameplay as FuryTank through checkbox "PvE: Use 2 one-handed weapons as Tank role" (by default is disabled)
+
+[Warrior v14]
+Execute 							- Will not be pre-shown in pvp mode for next gcd timing or rage pooling
+Hamstring 							- Will be skipped on additional slow-immuned buffs
+Overpower 							- Will be used at highest spell priority on Evasion and Deterrence
+Intercept 							- Will not be used for 2 sec after Charge
+Disarm 								- Will be used on Holy Strength
+
 [Warrior v13]
 Upgraded code for synchronization with new interrupt system 
 Fixed CancelBuff miss typo  

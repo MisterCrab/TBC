@@ -346,10 +346,11 @@ function Player:PrevGCDP(Index, Spell, ForcePred)
 			PredictedGCD = SpellName
 		end
 	end
-		
-	if PredictedGCD > 0 and Index == 1 or ForcePred then
+	
+	local bool = type(PredictedGCD) == "string" or PredictedGCD > 0
+	if bool and Index == 1 or ForcePred then
 		return PredictedGCD == Spell:Info()
-	elseif PredictedGCD > 0 then
+	elseif bool then
 		return Player:PrevGCD(Index - 1, Spell)
 	else
 		return Player:PrevGCD(Index, Spell)
