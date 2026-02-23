@@ -11181,10 +11181,15 @@ local AuraDuration = {
 					end 
 				end 
 			end
-			SetPortraitToTexture(auraCD.texture, icon)
-			originalPortrait:Hide()
-			auraCD:SetCooldown(expirationTime - duration, duration)
-			auraCD:Show()
+			if duration and expirationTime and icon then
+				SetPortraitToTexture(auraCD.texture, icon)
+				originalPortrait:Hide()
+				auraCD:SetCooldown(expirationTime - duration, duration)
+				auraCD:Show()
+			else
+				auraCD:Hide()
+				originalPortrait:Show()
+			end
 		else
 			auraCD:Hide()
 			originalPortrait:Show()
