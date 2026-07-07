@@ -189,8 +189,13 @@ local IsPlayerSpell 				= _G.IsPlayerSpell or function(spellID)
 	return FindSpellBookSlotBySpellID(spellID, false) or IsSpellInSpellBook(spellID, SpellBookSpellBankPlayer) or IsSpellKnownOrInSpellBook(spellID, SpellBookSpellBankPlayer)
 end
 
-local GCD_OneSecond 			= {
-	ROGUE 						= true,
+local GCD_OneSecond 		= {
+	[CONST.DRUID_FERAL] 		= true, 			-- Feral
+	[CONST.ROGUE_ASSASSINATION] = true, 			-- Assassination
+	[CONST.ROGUE_OUTLAW] 		= true, 			-- Outlaw
+	[CONST.ROGUE_SUBTLETY] 		= true, 			-- Subtlety
+	[CONST.MONK_BREWMASTER]		= true, 			-- Brewmaster
+	[CONST.MONK_WINDWALKER] 	= true, 			-- Windwalker
 }
 
 local function sortByHighest(x, y)
@@ -217,7 +222,7 @@ function A.GetGCD()
 		-- Depended by last used spell 
 		return TMW.GCD
 	else 
-		if GCD_OneSecond[A.PlayerClass] then 
+		if GCD_OneSecond[A.PlayerSpec] then 
 			return 1
 		else 
 			-- Depended on current haste
