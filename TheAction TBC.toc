@@ -1,4 +1,4 @@
-## Interface: 50504, 40402, 38000, 30405, 20505, 11508
+## Interface: 50504, 40402, 38001, 30405, 20506, 11509
 ## Title: TellMeWhen |cff00ccff The Action|r
 ## Notes: (\/)O_O(\/)
 ## RequiredDeps: TellMeWhen
@@ -61,7 +61,7 @@ Modules\Misc\BossMods.lua
 Modules\Misc\ElvUI.lua
 Modules\Misc\HeroLib.lua
 Modules\Misc\PMultiplier.lua
-Modules\Misc\PrevSpell.lua 
+Modules\Misc\PrevSpell.lua
 Modules\Misc\DRList.lua
 Modules\Misc\LibClassicCasterino.lua [AllowLoadGameType vanilla]
 Modules\Misc\LibHealComm.lua [AllowLoadGameType vanilla, tbc]

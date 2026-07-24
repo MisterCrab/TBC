@@ -1,5 +1,5 @@
 ---
-local DateTime 														= "08.07.2026"
+local DateTime 														= "25.07.2026"
 ---
 local pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string =
 	  pcall, ipairs, pairs, type, assert, error, setfenv, getmetatable, setmetatable, loadstring, next, unpack, select, _G, coroutine, table, math, string
@@ -130,8 +130,8 @@ local 	 EnumerateFrames, 	 GetCursorInfo							=
 	  _G.EnumerateFrames, _G.GetCursorInfo
 
 -- AuraDuration
-local 	 SetPortraitToTexture, 	  CooldownFrame_Set, 	CooldownFrame_Clear, 	ShowBossFrameWhenUninteractable =
-	  _G.SetPortraitToTexture, _G.CooldownFrame_Set, _G.CooldownFrame_Clear, _G.ShowBossFrameWhenUninteractable
+local 	 SetPortraitToTexture, 	  CooldownFrame_Set, 	CooldownFrame_Clear =
+	  _G.SetPortraitToTexture, _G.CooldownFrame_Set, _G.CooldownFrame_Clear
 
 -- Backwards compatibility for TargetFrame API. Since TBC Anniversary these functions moved under frame.
 local TargetFrame_ShouldShowDebuffs 								= _G.TargetFrame_ShouldShowDebuffs 		or function(...) return _G.TargetFrame:ShouldShowDebuffs(...) end
@@ -141,6 +141,7 @@ local TargetFrame_UpdateAuraPositions 								= _G.TargetFrame_UpdateAuraPositio
 local TargetFrame_UpdateBuffAnchor									= _G.TargetFrame_UpdateBuffAnchor 		or function(f, ...) return f:UpdateBuffAnchor(...) end
 local TargetFrame_UpdateDebuffAnchor 								= _G.TargetFrame_UpdateDebuffAnchor 	or function(f, ...) return f:UpdateDebuffAnchor(...) end
 local Target_Spellbar_AdjustPosition 								= _G.Target_Spellbar_AdjustPosition 	or function(sb) if sb and sb.AdjustPosition then sb:AdjustPosition() end end
+local ShowBossFrameWhenUninteractable								= _G.ShowBossFrameWhenUninteractable 	or function(unit) return _G.UnitIsVisible(unit) end
 
 local DebuffTypeColor, MAX_TARGET_BUFFS, MAX_TARGET_DEBUFFS 		= _G.DebuffTypeColor, _G.MAX_TARGET_BUFFS, _G.MAX_TARGET_DEBUFFS
 if not DebuffTypeColor then
@@ -11488,8 +11489,10 @@ local AuraDuration = {
 		end
 
 		-- TBC Anniversary now have full support: friendly/enemy buffs/debuffs
-		-- Classic still missing enemy buffs
-		if Action.BuildToC < 20000 then
+		-- Prior to 1.15.8 Classic Era was missing enemy buffs due to CUF's gate "GetClassicExpansionLevel() < LE_EXPANSION_BURNING_CRUSADE"
+		-- Since 1.15.9 CUF auras are rendered natively by secure Blizzard_PrivateAurasUI
+		-- (C_UnitAuras.AddPrivateAuraAnchor with showCountdownFrame = true) and gate is removed
+		if Action.BuildToC < 20000 and _G.CompactUnitFrame_UtilSetBuff and _G.CompactUnitFrame_UtilSetDebuff then
 			hooksecurefunc("CompactUnitFrame_UtilSetBuff", function(buffFrame, unit, index, filter)
 				if Action.IsInitialized and self.IsEnabled then
 					if type(unit) == "table" then
