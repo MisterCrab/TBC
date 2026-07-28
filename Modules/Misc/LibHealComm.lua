@@ -1,21 +1,41 @@
 -------------------------------------------------------------------------------------
 -- This lib has some memory leaks by recreate tables which can be static
--- These tweakes supposed to fix some of them 
+-- These tweakes supposed to fix some of them
+-- Also contains backport fixes (missing APIs on modern classic clients)
 -------------------------------------------------------------------------------------
 local HealComm = LibStub("LibHealComm-4.0", true)
-if not HealComm then return end 
+if not HealComm then return end
+
+-- Modern UI backport:
+-- C_UnitAuras.GetAuraDataBySpellName is not exported while shared AuraUtil.FindAuraByName dispatches into it
+-- Polyfill until game exports it natively
+local C_UnitAuras = _G.C_UnitAuras
+if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex and not C_UnitAuras.GetAuraDataBySpellName then
+	local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
+	C_UnitAuras.GetAuraDataBySpellName = function(unit, spellName, filter)
+		local i = 1
+		local auraData = GetAuraDataByIndex(unit, i, filter)
+		while auraData do
+			if auraData.name == spellName then
+				return auraData
+			end
+			i = i + 1
+			auraData = GetAuraDataByIndex(unit, i, filter)
+		end
+	end
+end
 
 local _G, ipairs, pairs, math	= _G, ipairs, pairs, math
-local bit						= _G.bit 
+local bit						= _G.bit
 local wipe						= _G.wipe
 local hooksecurefunc			= _G.hooksecurefunc
 
-local band 						= bit.band 
+local band 						= bit.band
 local floor						= math.floor
-local min						= math.min 
+local min						= math.min
 
 local TMW 						= _G.TMW
-local A 						= _G.Action 
+local A 						= _G.Action
 local TeamCache 				= A.TeamCache
 local TeamCacheFriendly			= TeamCache.Friendly
 local TeamCacheFriendlyUNITs	= TeamCacheFriendly.UNITs -- unitID to unitGUID
@@ -37,7 +57,7 @@ local UnitGUID					= _G.UnitGUID
 
 local function GetGUID(unitID)
 	return (unitID and TeamCacheFriendlyUNITs[unitID]) or UnitGUID(unitID)
-end 
+end
 
 local function filterData(spells, filterGUID, bitFlag, time, ignoreGUID)
 	local healAmount = 0
@@ -48,7 +68,7 @@ local function filterData(spells, filterGUID, bitFlag, time, ignoreGUID)
 				amount, stack, endTime,
 				ticksLeft, ticksPassed,
 				secondsLeft, bandSeconds, ticks, nextTickIn, fractionalBand
-				
+
 		for _, pending in pairs(spells) do
 			if( pending.bitType and band(pending.bitType, bitFlag) > 0 ) then
 				for i = 1, #(pending), 5 do
@@ -134,7 +154,7 @@ function HealComm:GetOthersHealAmount(guid, bitFlag, time)
 	return amount > 0 and amount or nil
 end
 
--- Refresh erased tables 
+-- Refresh erased tables
 hooksecurefunc(HealComm, "GROUP_ROSTER_UPDATE", function()
 	wipe(pendingTable)
 	pendingTable[#pendingTable + 1] = HealComm.pendingHeals
